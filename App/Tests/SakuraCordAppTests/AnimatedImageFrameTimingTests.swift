@@ -299,6 +299,37 @@ private final class StaticDecodeCancellationProbe: @unchecked Sendable {
     _ = await slow.value
 }
 
+@Test func `cancelled lottie load stops its shared download`() async throws {
+    let url = try #require(URL(string: "https://cdn.example/sticker.json"))
+    let probe = LottieDownloadCancellationProbe()
+    let loader = SharedTimelineLottieAnimationLoader { _ in
+        try await probe.download()
+    }
+    let load = Task { await loader.animation(for: url) }
+    #expect(await eventually { await probe.started })
+
+    load.cancel()
+
+    #expect(await load.value == nil)
+    #expect(await probe.cancelled)
+}
+
+private actor LottieDownloadCancellationProbe {
+    private(set) var started = false
+    private(set) var cancelled = false
+
+    func download() async throws -> Data {
+        started = true
+        do {
+            try await Task.sleep(for: .seconds(10))
+        } catch {
+            cancelled = true
+            throw error
+        }
+        return Data("{}".utf8)
+    }
+}
+
 private actor ControlledLottieDataLoader {
     private let slowURL: URL
     private var didStartSlow = false

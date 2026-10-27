@@ -120,7 +120,12 @@ actor SharedTimelineLottieAnimationLoader {
         cache.cacheSize = TimelineLottieLoadingPolicy.maximumCachedAnimations
         return cache
     }()
-    private var inFlight: [URL: Task<LottieAnimation?, Never>] = [:]
+    private struct InFlightLoad {
+        let task: Task<LottieAnimation?, Never>
+        var waiterCount: Int
+    }
+
+    private var inFlight: [URL: InFlightLoad] = [:]
     private var isParsing = false
     private struct ParseWaiter {
         let id: UUID
@@ -145,10 +150,23 @@ actor SharedTimelineLottieAnimationLoader {
         if let cached = cache.animation(forKey: url.absoluteString) {
             return cached
         }
-        if let task = inFlight[url] {
-            return await task.value
+        let task = inFlight[url]?.task ?? makeLoad(for: url)
+        inFlight[url, default: InFlightLoad(task: task, waiterCount: 0)].waiterCount += 1
+        // A sticker scrolled away mid-load cancels its download once no other
+        // overlay is waiting on it, rather than queueing ahead of visible media.
+        let animation = await withTaskCancellationHandler {
+            await task.value
+        } onCancel: {
+            Task { await self.cancelWaiter(for: url, task: task) }
         }
-        let task = Task<LottieAnimation?, Never> { [weak self] in
+        if inFlight[url]?.task == task {
+            inFlight[url] = nil
+        }
+        return animation
+    }
+
+    private func makeLoad(for url: URL) -> Task<LottieAnimation?, Never> {
+        Task<LottieAnimation?, Never> { [weak self] in
             guard let self else { return nil }
             let data = try? await self.loadData(url)
             guard let data, !Task.isCancelled,
@@ -168,10 +186,17 @@ actor SharedTimelineLottieAnimationLoader {
             await self.releaseParseLane()
             return animation
         }
-        inFlight[url] = task
-        let animation = await task.value
-        inFlight[url] = nil
-        return animation
+    }
+
+    private func cancelWaiter(for url: URL, task: Task<LottieAnimation?, Never>) {
+        guard var load = inFlight[url], load.task == task else { return }
+        load.waiterCount -= 1
+        if load.waiterCount > 0 {
+            inFlight[url] = load
+        } else {
+            inFlight[url] = nil
+            task.cancel()
+        }
     }
 
     private func acquireParseLane() async -> Bool {
