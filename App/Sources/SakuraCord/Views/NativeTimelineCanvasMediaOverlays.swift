@@ -958,6 +958,39 @@ extension NativeTimelineCanvasView {
 
     static let maximumLottieStickerOverlayCount = 4
 
+    /// Shows Lottie stickers entering the viewport mid-scroll, paused until
+    /// scrolling settles like the other animated media.
+    func presentVisibleLottieStickers() {
+        guard permitsAnimatedMediaPlayback,
+              var index = rowIndex(at: max(0, visibleRect.minY))
+        else { return }
+        var rows: [NativeMessageTimelineItem.Identifier: Set<URL>] = [:]
+        while items.indices.contains(index),
+              displayedRowOrigin(at: index) < visibleRect.maxY
+        {
+            let identifier = items[index].identifier
+            if case let .message(row, _, _) = items[index],
+               !hidesRowForSendTransition(identifier)
+            {
+                let urls = Self.lottieStickerURLs(in: row.message)
+                if !urls.isEmpty {
+                    rows[identifier] = urls
+                }
+            }
+            index += 1
+        }
+        lottieStickerRows = rows
+        reconcileLottieStickerOverlays(
+            reduceMotion: NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+        )
+    }
+
+    static func lottieStickerURLs(in message: Message) -> Set<URL> {
+        Set(message.stickers.compactMap { sticker in
+            sticker.format == .lottie ? sticker.mediaURL : nil
+        })
+    }
+
     func reconcileLottieStickerOverlays(reduceMotion: Bool) {
         var desired: [DesiredLottieStickerOverlay] = []
         desired.reserveCapacity(Self.maximumLottieStickerOverlayCount)
@@ -1030,7 +1063,11 @@ extension NativeTimelineCanvasView {
             }
             overlay.frame = item.frame
             overlay.alphaValue = item.opacity
-            overlay.display(item.key.url, reduceMotion: reduceMotion)
+            overlay.display(
+                item.key.url,
+                reduceMotion: reduceMotion,
+                pausedForScroll: suppressesHoverPresentation
+            )
         }
     }
 

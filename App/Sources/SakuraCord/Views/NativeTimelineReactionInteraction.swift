@@ -419,10 +419,7 @@ extension NativeTimelineCanvasView {
             if !videoURLs.isEmpty {
                 videoRows[identifier] = videoURLs
             }
-            let stickerURLs = Set(row.message.stickers.compactMap { sticker -> URL? in
-                guard sticker.format == .lottie else { return nil }
-                return sticker.mediaURL
-            })
+            let stickerURLs = Self.lottieStickerURLs(in: row.message)
             if !stickerURLs.isEmpty {
                 stickerRows[identifier] = stickerURLs
             }

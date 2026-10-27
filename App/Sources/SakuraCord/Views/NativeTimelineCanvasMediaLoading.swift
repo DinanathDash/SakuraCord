@@ -298,6 +298,7 @@ extension NativeTimelineCanvasView {
         }
         reconcileSpoilerOverlays()
         startVisibleInlineVideosImmediately()
+        presentVisibleLottieStickers()
     }
 
     func uncachedMediaKeys(

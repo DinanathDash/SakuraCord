@@ -7,6 +7,8 @@ final class NativeTimelineLottieStickerOverlay: NSView {
     let progressIndicator = NSProgressIndicator()
     var loadingTask: Task<Void, Never>?
     var url: URL?
+    private var reduceMotion = false
+    private var isPausedForScroll = false
 
     override var isFlipped: Bool { true }
 
@@ -44,7 +46,10 @@ final class NativeTimelineLottieStickerOverlay: NSView {
         )
     }
 
-    func display(_ url: URL, reduceMotion: Bool) {
+    /// A load that finishes later applies the state from the latest call.
+    func display(_ url: URL, reduceMotion: Bool, pausedForScroll: Bool = false) {
+        self.reduceMotion = reduceMotion
+        isPausedForScroll = pausedForScroll
         if self.url != url {
             stop()
             self.url = url
@@ -62,25 +67,28 @@ final class NativeTimelineLottieStickerOverlay: NSView {
                 self.animationView.animation = animation
                 self.animationView.isHidden = animation == nil
                 self.progressIndicator.isHidden = animation != nil
-                self.updatePlayback(reduceMotion: reduceMotion)
+                self.updatePlayback()
             }
         } else {
-            updatePlayback(reduceMotion: reduceMotion)
+            updatePlayback()
         }
     }
 
-    func updatePlayback(reduceMotion: Bool) {
+    private func updatePlayback() {
         animationView.loopMode = .loop
         guard animationView.animation != nil else { return }
         if reduceMotion {
             animationView.pause()
             animationView.currentProgress = 0
+        } else if isPausedForScroll {
+            animationView.pause()
         } else if !animationView.isAnimationPlaying {
             animationView.play()
         }
     }
 
     func pauseForScroll() {
+        isPausedForScroll = true
         animationView.pause()
     }
 
