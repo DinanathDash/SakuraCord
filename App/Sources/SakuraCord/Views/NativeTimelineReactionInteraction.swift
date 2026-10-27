@@ -349,7 +349,6 @@ extension NativeTimelineCanvasView {
         else {
             animatedMediaRows.removeAll()
             inlineVideoRows.removeAll()
-            lottieStickerRows.removeAll()
             removeInlineVideoOverlays()
             removeLottieStickerOverlays()
             removeAnimatedMediaOverlays()
@@ -364,8 +363,6 @@ extension NativeTimelineCanvasView {
         var rows:
             [NativeMessageTimelineItem.Identifier: Set<NativeTimelineMediaKey>] = [:]
         var videoRows:
-            [NativeMessageTimelineItem.Identifier: Set<URL>] = [:]
-        var stickerRows:
             [NativeMessageTimelineItem.Identifier: Set<URL>] = [:]
         while items.indices.contains(index),
               displayedRowOrigin(at: index) < visibleRect.maxY
@@ -419,15 +416,10 @@ extension NativeTimelineCanvasView {
             if !videoURLs.isEmpty {
                 videoRows[identifier] = videoURLs
             }
-            let stickerURLs = Self.lottieStickerURLs(in: row.message)
-            if !stickerURLs.isEmpty {
-                stickerRows[identifier] = stickerURLs
-            }
             index += 1
         }
         animatedMediaRows = rows
         inlineVideoRows = videoRows
-        lottieStickerRows = stickerRows
         reconcileAnimatedMediaOverlays(reduceMotion: reduceMotion)
         if !allowsScrolling {
             reconcileInlineVideoOverlays(

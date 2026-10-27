@@ -594,7 +594,6 @@ extension NativeTimelineCanvasView {
             animatedMediaReconcileTask = nil
             animatedMediaRows.removeAll()
             inlineVideoRows.removeAll()
-            lottieStickerRows.removeAll()
             removeInlineVideoOverlays()
             removeVoiceMessageOverlay()
             removeLottieStickerOverlays()

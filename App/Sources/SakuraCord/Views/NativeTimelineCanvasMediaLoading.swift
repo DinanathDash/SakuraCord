@@ -298,7 +298,12 @@ extension NativeTimelineCanvasView {
         }
         reconcileSpoilerOverlays()
         startVisibleInlineVideosImmediately()
-        presentVisibleLottieStickers()
+        // Shown paused until scrolling settles, like the other animated media.
+        if permitsAnimatedMediaPlayback {
+            reconcileLottieStickerOverlays(
+                reduceMotion: NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+            )
+        }
     }
 
     func uncachedMediaKeys(

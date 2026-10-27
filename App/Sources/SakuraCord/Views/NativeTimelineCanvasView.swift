@@ -330,8 +330,6 @@ final class NativeTimelineCanvasView: NSView, WindowModalInputParticipant {
         [NativeMessageTimelineItem.Identifier: Set<NativeTimelineMediaKey>] = [:]
     var inlineVideoRows:
         [NativeMessageTimelineItem.Identifier: Set<URL>] = [:]
-    var lottieStickerRows:
-        [NativeMessageTimelineItem.Identifier: Set<URL>] = [:]
     var inlineVideoOverlays:
         [InlineVideoOverlayKey: NativeTimelineInlineVideoOverlay] = [:]
     var lottieStickerOverlays:

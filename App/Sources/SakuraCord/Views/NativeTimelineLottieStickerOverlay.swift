@@ -150,8 +150,10 @@ actor SharedTimelineLottieAnimationLoader {
         if let cached = cache.animation(forKey: url.absoluteString) {
             return cached
         }
-        let task = inFlight[url]?.task ?? makeLoad(for: url)
-        inFlight[url, default: InFlightLoad(task: task, waiterCount: 0)].waiterCount += 1
+        var load = inFlight[url] ?? InFlightLoad(task: makeLoad(for: url), waiterCount: 0)
+        load.waiterCount += 1
+        inFlight[url] = load
+        let task = load.task
         // A sticker scrolled away mid-load cancels its download once no other
         // overlay is waiting on it, rather than queueing ahead of visible media.
         let animation = await withTaskCancellationHandler {
