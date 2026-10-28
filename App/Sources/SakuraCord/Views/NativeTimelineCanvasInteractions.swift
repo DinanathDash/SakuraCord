@@ -750,7 +750,7 @@ extension NativeTimelineCanvasView {
             revealTextSpoiler(key)
             return true
         }
-        if let mention = hit.mention, mention.isInteractive, let message {
+        if let mention = hit.mention, mention.isInteractive {
             let anchor = StablePopoverAnchor(
                 sourceView: self
             ) { [weak self] in
@@ -805,7 +805,7 @@ extension NativeTimelineCanvasView {
 
     func activateMention(
         _ mention: MentionPresentation,
-        message: Message,
+        message: Message? = nil,
         anchor: StablePopoverAnchor
     ) {
         guard let model else { return }

@@ -984,7 +984,7 @@ extension NativeTimelineCanvasView {
 
     func showMentionProfile(
         for user: User,
-        sourceMessage: Message,
+        sourceMessage: Message? = nil,
         anchor: StablePopoverAnchor
     ) {
         guard let model else { return }
@@ -1005,12 +1005,12 @@ extension NativeTimelineCanvasView {
 
     func showMentionRole(
         _ roleID: RoleID,
-        sourceMessage: Message,
+        sourceMessage: Message? = nil,
         anchor: StablePopoverAnchor
     ) {
         guard let model else { return }
         closeMessageProfilePopover()
-        let guildID = model.messagePresentationGuildID(for: sourceMessage)
+        let guildID = sourceMessage.flatMap { model.messagePresentationGuildID(for: $0) } ?? model.selectedGuildID
         model.showMembers(withRole: roleID, in: guildID)
         showMentionPopover(
             AnyView(

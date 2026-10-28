@@ -101,14 +101,25 @@ enum NativeTimelineBeginningText {
     }
 
     static func description(
-        _ beginning: NativeTimelineBeginning
+        _ beginning: NativeTimelineBeginning,
+        source: AppModel? = nil
     ) -> NativeTimelineAttributedTextBox {
         let baseFontSize = NSFont.interfacePreferredFont(forTextStyle: .body).pointSize
-        let plan = DiscordMarkdown.appKitPlan(beginning.description)
+        let prepared = RichMessageAttributedText.prepare(source: beginning.description)
+        let resolver = source.map { MessageMentionResolver(model: $0, message: nil) }
+        let mentions = prepared.tokens.reduce(into: [String: MentionPresentation]()) { result, token in
+            guard case let .mention(mention) = token else { return }
+            result[mention.rawToken] =
+                resolver?.presentation(mention)
+                ?? MentionPresentation.fallback(for: mention)
+        }
+        let emojiSize = InterfaceScale.metric(22)
         let attributed = NSMutableAttributedString(
-            attributedString: NativeTimelineCoreText.scaledMarkdown(
-                plan,
-                baseFontSize: baseFontSize
+            attributedString: NativeTimelineCoreText.make(
+                prepared: prepared,
+                emojiSize: emojiSize,
+                baseFontSize: baseFontSize,
+                mentionPresentations: mentions
             )
         )
         let fullRange = NSRange(location: 0, length: attributed.length)
