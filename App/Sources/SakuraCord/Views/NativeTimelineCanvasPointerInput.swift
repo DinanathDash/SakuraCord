@@ -681,6 +681,17 @@ extension NativeTimelineCanvasView {
             }
             return
         }
+        if case .beginning = item {
+            if handleTextClick(
+                in: layout,
+                message: nil,
+                point: local,
+                rowIdentifier: item.identifier
+            ) {
+                return
+            }
+            return
+        }
         guard case let .message(row, _, _) = item else { return }
         let layout = layouts[index]
         if handleComponentClick(
@@ -1294,7 +1305,7 @@ extension NativeTimelineCanvasView {
         guard let index = rowIndex(at: point.y),
               items.indices.contains(index),
               layouts.indices.contains(index),
-              items[index].messageID != nil
+              items[index].messageID != nil || items[index].beginning != nil
         else { return nil }
         let local = CGPoint(
             x: point.x,
@@ -1318,7 +1329,7 @@ extension NativeTimelineCanvasView {
         guard let index = rowIndex(at: point.y),
               items.indices.contains(index),
               layouts.indices.contains(index),
-              items[index].messageID != nil
+              items[index].messageID != nil || items[index].beginning != nil
         else { return nil }
         let local = CGPoint(
             x: point.x,
@@ -1460,11 +1471,19 @@ extension NativeTimelineCanvasView {
             else { return nil }
             return .loader
         }
+        if case let .beginning(beginning) = item {
+            return textActivationTarget(
+                messageID: MessageID(rawValue: beginning.id.rawValue),
+                itemIdentifier: item.identifier,
+                layout: layout,
+                point: local
+            )
+        }
         guard case let .message(row, _, _) = item else { return nil }
         let message = row.message
         return componentActivationTarget(message: message, layout: layout, point: local)
             ?? textActivationTarget(
-                message: message,
+                messageID: message.id,
                 itemIdentifier: item.identifier,
                 layout: layout,
                 point: local
@@ -1528,7 +1547,7 @@ extension NativeTimelineCanvasView {
     }
 
     private func textActivationTarget(
-        message: Message,
+        messageID: MessageID,
         itemIdentifier: NativeMessageTimelineItem.Identifier,
         layout: NativeTimelineRowLayout,
         point: CGPoint
@@ -1541,7 +1560,7 @@ extension NativeTimelineCanvasView {
                     rangeLocation: spoilerRange.location
                 ), !spoilerRevealStore.isTextRevealed(key) {
                     return .textSpoiler(
-                        message.id,
+                        messageID,
                         text.region,
                         rangeLocation: spoilerRange.location
                     )
@@ -1549,7 +1568,7 @@ extension NativeTimelineCanvasView {
             }
             if let mention = text.hit.mention, mention.isInteractive {
                 return .textMention(
-                    message.id,
+                    messageID,
                     text.region,
                     characterIndex: text.hit.characterIndex,
                     rawToken: mention.rawToken
@@ -1557,7 +1576,7 @@ extension NativeTimelineCanvasView {
             }
             if let url = text.hit.url {
                 return .textURL(
-                    message.id,
+                    messageID,
                     text.region,
                     characterIndex: text.hit.characterIndex,
                     url: url

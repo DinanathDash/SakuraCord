@@ -592,7 +592,7 @@ extension NativeTimelineCanvasView {
 
     func handleTextClick(
         in layout: NativeTimelineRowLayout,
-        message: Message,
+        message: Message? = nil,
         point: CGPoint,
         rowIdentifier: NativeMessageTimelineItem.Identifier
     ) -> Bool {
@@ -719,12 +719,23 @@ extension NativeTimelineCanvasView {
                 }
             }
         }
+        if let beginning = layout.beginningLayout,
+           let hit = NativeTimelineTextHitTester.hit(
+               box: beginning.descriptionBox,
+               frame: beginning.descriptionFrame,
+               point: point
+           ), hit.mention != nil
+               || hit.url != nil
+               || hit.spoilerRange != nil
+        {
+            return TextPointerHit(hit: hit, region: .beginningDescription)
+        }
         return nil
     }
 
     func activateTextHit(
         _ hit: NativeTimelineTextHit,
-        message: Message,
+        message: Message? = nil,
         rowIdentifier: NativeMessageTimelineItem.Identifier,
         region: NativeTimelineTextRegion,
         profileAnchor: CGRect? = nil
@@ -739,7 +750,7 @@ extension NativeTimelineCanvasView {
             revealTextSpoiler(key)
             return true
         }
-        if let mention = hit.mention, mention.isInteractive {
+        if let mention = hit.mention, mention.isInteractive, let message {
             let anchor = StablePopoverAnchor(
                 sourceView: self
             ) { [weak self] in
@@ -758,9 +769,11 @@ extension NativeTimelineCanvasView {
             return true
         }
         guard let url = hit.url else { return false }
-        let presentSystemProfile: ((User) -> Void)? = profileAnchor.map { anchor in
-            { [weak self] user in
-                self?.showMessageProfile(for: user, sourceMessage: message, anchor: anchor)
+        let presentSystemProfile: ((User) -> Void)? = profileAnchor.flatMap { anchor in
+            message.map { sourceMessage in
+                { [weak self] user in
+                    self?.showMessageProfile(for: user, sourceMessage: sourceMessage, anchor: anchor)
+                }
             }
         }
         return MessageLinkActivator.activate(
@@ -934,6 +947,7 @@ extension NativeTimelineCanvasView {
     func spoilerRevealStateDidChange(messageID: MessageID) {
         guard let rowIndex = items.firstIndex(where: {
             $0.messageID == messageID
+                || $0.beginning?.id.rawValue == messageID.rawValue
         }) else { return }
         let identifier = items[rowIndex].identifier
         visibleMediaProjection = nil

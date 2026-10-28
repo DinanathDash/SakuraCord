@@ -271,6 +271,7 @@ struct NativeTimelineBeginningLayout {
     let iconFrame: CGRect
     let titleFrame: CGRect
     let descriptionFrame: CGRect
+    let descriptionBox: NativeTimelineAttributedTextBox
     let dateSeparatorFrame: CGRect?
     let height: CGFloat
 
@@ -318,6 +319,7 @@ struct NativeTimelineBeginningLayout {
             iconFrame: iconFrame,
             titleFrame: titleFrame,
             descriptionFrame: descriptionFrame,
+            descriptionBox: descriptionBox,
             dateSeparatorFrame: dateSeparatorFrame,
             height: dateSeparatorFrame?.maxY ?? contentHeight
         )

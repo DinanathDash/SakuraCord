@@ -585,7 +585,8 @@ enum NativeTimelineRowPainter {
             drawBeginning(
                 beginning,
                 layout: layout,
-                textSelection: textSelection
+                textSelection: textSelection,
+                revealedTextSpoilerState: revealedTextSpoilerState
             )
         case let .loader(isLoading, kind):
             drawLoader(
@@ -716,7 +717,8 @@ enum NativeTimelineRowPainter {
     static func drawBeginning(
         _ beginning: NativeTimelineBeginning,
         layout rowLayout: NativeTimelineRowLayout,
-        textSelection: NativeTimelineTextSelection?
+        textSelection: NativeTimelineTextSelection?,
+        revealedTextSpoilerState: NativeTimelineTextSpoilerRevealState = .init()
     ) {
         guard let layout = rowLayout.beginningLayout else { return }
         NSColor.secondaryLabelColor.withAlphaComponent(0.10).setFill()
@@ -775,10 +777,11 @@ enum NativeTimelineRowPainter {
             )
         }
         attributedText(
-            NativeTimelineBeginningText.description(beginning),
+            layout.descriptionBox,
             in: layout.descriptionFrame,
             model: nil,
-            selectionRange: selectedRegion == .beginningDescription ? textSelection?.range : nil
+            selectionRange: selectedRegion == .beginningDescription ? textSelection?.range : nil,
+            revealedSpoilerLocations: revealedTextSpoilerState.locations(in: .beginningDescription)
         )
         if let date = beginning.startedAt,
            let frame = layout.dateSeparatorFrame

@@ -634,10 +634,8 @@ extension NativeTimelineCanvasView {
                 value: title.value,
                 framesetter: title.framesetter
             ))
-            if beginning.isDescriptionSelectable {
-                let description = NativeTimelineBeginningText.description(
-                    beginning
-                )
+            if beginning.isDescriptionSelectable || includesNonSelectable {
+                let description = beginningLayout.descriptionBox
                 result.append(SelectableTextRegion(
                     region: .beginningDescription,
                     frame: beginningLayout.descriptionFrame,
