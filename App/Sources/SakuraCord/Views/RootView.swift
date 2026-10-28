@@ -1,5 +1,6 @@
 import AppKit
 import Combine
+import MessageRendering
 import SakuraCordModels
 import SwiftUI
 
@@ -1817,7 +1818,7 @@ private struct ChannelTopicPopover: View {
     let topic: String
 
     var body: some View {
-        Text(topic)
+        Text(DiscordMarkdown.attributed(topic))
             .frame(maxWidth: .infinity, alignment: .leading)
             .textSelection(.enabled)
             .tint(SakuraCordAccentColor.color)

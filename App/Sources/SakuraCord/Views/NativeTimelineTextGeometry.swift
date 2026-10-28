@@ -4,6 +4,7 @@ import Combine
 import CoreText
 import ImageIO
 import Lottie
+import MessageRendering
 import QuartzCore
 import SakuraCordModels
 import SwiftUI
@@ -102,11 +103,23 @@ enum NativeTimelineBeginningText {
     static func description(
         _ beginning: NativeTimelineBeginning
     ) -> NativeTimelineAttributedTextBox {
-        box(
-            beginning.description,
-            font: .interfacePreferredFont(forTextStyle: .body),
-            color: .secondaryLabelColor
+        let baseFontSize = NSFont.interfacePreferredFont(forTextStyle: .body).pointSize
+        let plan = DiscordMarkdown.appKitPlan(beginning.description)
+        let attributed = NSMutableAttributedString(
+            attributedString: NativeTimelineCoreText.scaledMarkdown(
+                plan,
+                baseFontSize: baseFontSize
+            )
         )
+        let fullRange = NSRange(location: 0, length: attributed.length)
+        if fullRange.length > 0 {
+            attributed.enumerateAttribute(.foregroundColor, in: fullRange) { value, range, _ in
+                if let color = value as? NSColor, color == NSColor.labelColor {
+                    attributed.addAttribute(.foregroundColor, value: NSColor.secondaryLabelColor, range: range)
+                }
+            }
+        }
+        return NativeTimelineAttributedTextBox(attributed)
     }
 
     static func box(

@@ -1,5 +1,6 @@
 import AppKit
 import DiscordProtocol
+import MessageRendering
 import SakuraCordModels
 import SwiftUI
 import UniformTypeIdentifiers
@@ -903,7 +904,7 @@ private struct ForumPostComposer: View {
             VStack(alignment: .leading, spacing: InterfaceScale.metric(16)) {
                 Text("Posting Guidelines").font(.interface(.title).bold())
                 ScrollView {
-                    Text(channel.topic ?? "")
+                    Text(DiscordMarkdown.attributed(channel.topic ?? ""))
                         .textSelection(.enabled)
                         .tint(SakuraCordAccentColor.color)
                         .frame(maxWidth: .infinity, alignment: .leading)

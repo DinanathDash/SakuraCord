@@ -774,24 +774,12 @@ enum NativeTimelineRowPainter {
                 lineBreakMode: .byWordWrapping
             )
         }
-        if selectedRegion == .beginningDescription,
-           let selectionRange = textSelection?.range
-        {
-            attributedText(
-                NativeTimelineBeginningText.description(beginning),
-                in: layout.descriptionFrame,
-                model: nil,
-                selectionRange: selectionRange
-            )
-        } else {
-            text(
-                beginning.description,
-                in: layout.descriptionFrame,
-                font: .interfacePreferredFont(forTextStyle: .body),
-                color: .secondaryLabelColor,
-                lineBreakMode: .byWordWrapping
-            )
-        }
+        attributedText(
+            NativeTimelineBeginningText.description(beginning),
+            in: layout.descriptionFrame,
+            model: nil,
+            selectionRange: selectedRegion == .beginningDescription ? textSelection?.range : nil
+        )
         if let date = beginning.startedAt,
            let frame = layout.dateSeparatorFrame
         {
