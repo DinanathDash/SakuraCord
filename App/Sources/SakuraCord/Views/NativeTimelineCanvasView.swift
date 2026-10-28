@@ -586,7 +586,8 @@ enum NativeTimelineRowPainter {
                 beginning,
                 layout: layout,
                 textSelection: textSelection,
-                revealedTextSpoilerState: revealedTextSpoilerState
+                revealedTextSpoilerState: revealedTextSpoilerState,
+                model: model
             )
         case let .loader(isLoading, kind):
             drawLoader(
@@ -718,7 +719,8 @@ enum NativeTimelineRowPainter {
         _ beginning: NativeTimelineBeginning,
         layout rowLayout: NativeTimelineRowLayout,
         textSelection: NativeTimelineTextSelection?,
-        revealedTextSpoilerState: NativeTimelineTextSpoilerRevealState = .init()
+        revealedTextSpoilerState: NativeTimelineTextSpoilerRevealState = .init(),
+        model: AppModel? = nil
     ) {
         guard let layout = rowLayout.beginningLayout else { return }
         NSColor.secondaryLabelColor.withAlphaComponent(0.10).setFill()
@@ -731,7 +733,7 @@ enum NativeTimelineRowPainter {
                 // AppKit applies a configured palette color's alpha again
                 // while rasterizing this hierarchical symbol. The square
                 // root preserves SwiftUI's 55% secondary foreground result.
-                paletteColors: [
+                paletteColors: [\
                     NSColor.labelColor.withAlphaComponent(0.74)
                 ]
             )
@@ -779,7 +781,7 @@ enum NativeTimelineRowPainter {
         attributedText(
             layout.descriptionBox,
             in: layout.descriptionFrame,
-            model: nil,
+            model: model,
             selectionRange: selectedRegion == .beginningDescription ? textSelection?.range : nil,
             revealedSpoilerLocations: revealedTextSpoilerState.locations(in: .beginningDescription)
         )
