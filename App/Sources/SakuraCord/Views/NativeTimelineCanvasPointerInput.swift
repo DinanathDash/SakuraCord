@@ -662,19 +662,20 @@ extension NativeTimelineCanvasView {
               let actions
         else { return }
         let item = items[index]
+        let layout = layouts[index]
         let local = CGPoint(
             x: point.x,
             y: point.y - displayedRowOrigin(at: index)
         )
         if case let .suppressedMessages(group) = item {
-            if layouts[index].suppressedHeader?.toggleFrame.contains(local) == true {
+            if layout.suppressedHeader?.toggleFrame.contains(local) == true {
                 toggleSuppressedGroup(group)
             }
             return
         }
         if case let .loader(isLoading, _) = item {
             if !isLoading,
-               layouts[index].loaderLayout?.controlFrame.contains(local)
+               layout.loaderLayout?.controlFrame.contains(local)
                     == true
             {
                 actions.loadEarlier()
@@ -693,7 +694,6 @@ extension NativeTimelineCanvasView {
             return
         }
         guard case let .message(row, _, _) = item else { return }
-        let layout = layouts[index]
         if handleComponentClick(
             in: layout,
             message: row.message,
