@@ -490,14 +490,16 @@ enum NativeTimelineRowPainter {
     static func selectionOverlayImage(
         _ box: NativeTimelineAttributedTextBox,
         size: CGSize,
-        selectionRange: NSRange
+        selectionRange: NSRange,
+        revealedSpoilerLocations: Set<Int> = []
     ) -> NSImage {
         NSImage(size: size, flipped: true) { frame in
             attributedText(
                 box,
                 in: frame,
                 model: nil,
-                selectionRange: selectionRange
+                selectionRange: selectionRange,
+                revealedSpoilerLocations: revealedSpoilerLocations
             )
             return true
         }

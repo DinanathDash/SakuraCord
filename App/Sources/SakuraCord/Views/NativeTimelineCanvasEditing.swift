@@ -746,13 +746,16 @@ extension NativeTimelineCanvasView {
 
         let box: NativeTimelineAttributedTextBox
         let localFrame: CGRect
+        let revealedLocations: Set<Int>
         switch selection.region {
         case .beginningTitle:
             box = NativeTimelineBeginningText.title(beginning)
             localFrame = layout.titleFrame
+            revealedLocations = []
         case .beginningDescription:
-            box = NativeTimelineBeginningText.description(beginning)
+            box = layout.descriptionBox
             localFrame = layout.descriptionFrame
+            revealedLocations = textSpoilerRevealState(at: index).locations(in: .beginningDescription)
         default:
             beginningSelectionOverlay.image = nil
             beginningSelectionOverlay.isHidden = true
@@ -769,7 +772,8 @@ extension NativeTimelineCanvasView {
             NativeTimelineRowPainter.selectionOverlayImage(
                 box,
                 size: overlayFrame.size,
-                selectionRange: selection.range
+                selectionRange: selection.range,
+                revealedSpoilerLocations: revealedLocations
             )
         beginningSelectionOverlay.isHidden = false
     }
