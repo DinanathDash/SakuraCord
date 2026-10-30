@@ -100,16 +100,12 @@ extension NativeTimelineCanvasView {
                         )
                     }
                 }
-                if let frame = layouts[index]
-                    .commandInvocationRegion?.profileFrame
-                {
-                    addCursorRect(
-                        frame.offsetBy(dx: 0, dy: rowOrigin),
-                        cursor: .pointingHand
-                    )
+                if let region = layouts[index].commandInvocationRegion {
+                    addCursorRect(region.profileFrame.offsetBy(dx: 0, dy: rowOrigin), cursor: .pointingHand)
+                    addCursorRect(region.pillFrame.offsetBy(dx: 0, dy: rowOrigin), cursor: .pointingHand)
                 }
-                if let frame = layouts[index]
-                    .ephemeralRegion?.dismissFrame
+                for frame in [layouts[index].ephemeralRegion?.dismissFrame].compactMap(\.self)
+                    + layouts[index].deliveryActions.map(\.frame)
                 {
                     addCursorRect(
                         frame.offsetBy(dx: 0, dy: rowOrigin),
@@ -229,6 +225,7 @@ extension NativeTimelineCanvasView {
             authorNamePointerHit(at: point)
         )
         setHoveredServerTagMessageID(serverTagPointerHit(at: point))
+        setHoveredCommandPillMessageID(commandPillPointerHit(at: point))
         setHoveredMention(
             mentionPointerHit(at: point)
         )
@@ -274,6 +271,7 @@ extension NativeTimelineCanvasView {
         )
         setHoveredAuthorMessageID(authorNamePointerHit(at: point))
         setHoveredServerTagMessageID(serverTagPointerHit(at: point))
+        setHoveredCommandPillMessageID(commandPillPointerHit(at: point))
         setHoveredMention(mentionPointerHit(at: point))
         setHoveredTextLink(textLinkPointerHit(at: point))
         setHoveredTextSpoiler(textSpoilerPointerHit(at: point))
@@ -509,7 +507,7 @@ extension NativeTimelineCanvasView {
         if layouts[index].translationRegion?.actionFrame?.contains(local) == true {
             return .init(messageID: messageID, kind: .translation)
         }
-        return nil
+        return layouts[index].deliveryAction(at: local).map { .init(messageID: messageID, kind: $0) }
     }
 
     override func mouseDragged(with event: NSEvent) {
@@ -742,6 +740,16 @@ extension NativeTimelineCanvasView {
             model?.performMessageTranslationCaptionAction(row.message)
             return true
         }
+        switch layout.deliveryAction(at: point) {
+        case let .cancelUpload(attachmentID):
+            model?.cancelAttachmentUpload(attachmentID, of: row.message)
+            return true
+        case .retrySend:
+            actions?.retry(row.message)
+            return true
+        default:
+            break
+        }
         if let tag = layout.serverTagRegion, tag.frame.contains(point),
            let guildID = tag.presentation.identity.guildID {
             showServerTagCard(guildID: guildID, anchor: tag.frame.offsetBy(dx: 0, dy: displayedRowOrigin(at: rowIndex)))
@@ -766,6 +774,10 @@ extension NativeTimelineCanvasView {
                     dy: displayedRowOrigin(at: rowIndex)
                 )
             )
+            return true
+        }
+        if layout.commandInvocationRegion?.pillFrame.contains(point) == true {
+            showCommandInvocation(for: row.message)
             return true
         }
         if let invocation = layout.commandInvocationRegion,
@@ -1027,7 +1039,8 @@ extension NativeTimelineCanvasView {
     func showMentionPopover(
         _ content: AnyView,
         anchor: StablePopoverAnchor,
-        configuration: StablePopoverConfiguration = .interactive
+        configuration: StablePopoverConfiguration = .interactive,
+        presentationIdentity: AnyHashable? = nil
     ) {
         activeMentionPopoverAnchor = anchor
         mentionPopoverCoordinator.update(
@@ -1038,6 +1051,7 @@ extension NativeTimelineCanvasView {
             onDismiss: { [weak self] in
                 self?.activeMentionPopoverAnchor = nil
             },
+            presentationIdentity: presentationIdentity,
             content: content
         )
     }
@@ -1215,6 +1229,7 @@ extension NativeTimelineCanvasView {
                 : nil
         )
         setHoveredServerTagMessageID(visibleRect.contains(point) ? serverTagPointerHit(at: point) : nil)
+        setHoveredCommandPillMessageID(visibleRect.contains(point) ? commandPillPointerHit(at: point) : nil)
         setHoveredMention(
             visibleRect.contains(point)
                 ? mentionPointerHit(at: point)
@@ -1598,6 +1613,9 @@ extension NativeTimelineCanvasView {
         if layout.translationRegion?.actionFrame?.contains(point) == true {
             return .translationAction(message.id)
         }
+        if let kind = layout.deliveryAction(at: point) {
+            return .deliveryAction(message.id, kind)
+        }
         if let tag = layout.serverTagRegion, tag.frame.contains(point),
            let guildID = tag.presentation.identity.guildID {
             return .serverTag(message.id, guildID)
@@ -1615,6 +1633,9 @@ extension NativeTimelineCanvasView {
             == true
         {
             return .invocationProfile(message.id)
+        }
+        if layout.commandInvocationRegion?.pillFrame.contains(point) == true {
+            return .commandPill(message.id)
         }
         if layout.replyFrame?.contains(point) == true,
            let replyID = row.replyMessageID

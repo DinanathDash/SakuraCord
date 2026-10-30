@@ -217,7 +217,6 @@ extension NativeTimelineCanvasView {
         reconcileBeginningSelectionOverlay()
         positionInlineVideoOverlays()
         reconcileVoiceMessageOverlay()
-        positionLottieStickerOverlays()
         reconcileActivityIndicators()
         positionSpoilerOverlays()
         componentChoiceOverlay?.repositionWithAnchor()
@@ -337,15 +336,12 @@ extension NativeTimelineCanvasView {
         suppressesHoverPresentation = true
         finishSendTransitions()
         // Pause native playback once without destroying its presentation.
-        // Recreating AVPlayer and Lottie overlays on each reconciliation
+        // Recreating AVPlayer overlays on each reconciliation
         // produced the benchmark's regular FAST/pause cadence, while removing
         // them made otherwise loaded videos and stickers blink out as soon as
         // scrolling began. Retaining the bounded overlays preserves their
         // current frames and avoids both costs.
         for overlay in inlineVideoOverlays.values {
-            overlay.pauseForScroll()
-        }
-        for overlay in lottieStickerOverlays.values {
             overlay.pauseForScroll()
         }
         for overlay in animatedMediaOverlays.values {
@@ -423,7 +419,10 @@ extension NativeTimelineCanvasView {
             invalidateThreadCard(messageID: messageID)
         }
         if let messageID = clearedTargets.serverTagMessageID {
-            invalidateServerTag(messageID: messageID)
+            invalidateVisibleMessageRow(messageID: messageID)
+        }
+        if let messageID = clearedTargets.commandPillMessageID {
+            invalidateVisibleMessageRow(messageID: messageID)
         }
         if let messageID = clearedTargets.footerAction?.messageID,
            let index = items.firstIndex(where: { $0.messageID == messageID })
@@ -545,7 +544,6 @@ extension NativeTimelineCanvasView {
         positionAnimatedMediaOverlays()
         positionInlineVideoOverlays()
         reconcileVoiceMessageOverlay()
-        positionLottieStickerOverlays()
         reconcileActivityIndicators()
         positionSpoilerOverlays()
     }
@@ -594,10 +592,8 @@ extension NativeTimelineCanvasView {
             animatedMediaReconcileTask = nil
             animatedMediaRows.removeAll()
             inlineVideoRows.removeAll()
-            lottieStickerRows.removeAll()
             removeInlineVideoOverlays()
             removeVoiceMessageOverlay()
-            removeLottieStickerOverlays()
             removeAnimatedMediaOverlays()
             removeActivityIndicators()
             removeSpoilerOverlays()
@@ -918,6 +914,7 @@ extension NativeTimelineCanvasView {
             || hoveredAuthorMessageID == item.messageID
             || hoveredServerTagMessageID == item.messageID
             || serverTagCardPresentation?.messageID == item.messageID
+            || hoveredCommandPillMessageID == item.messageID
             || hoveredMention?.itemIdentifier == item.identifier
             || hoveredTextLink?.itemIdentifier == item.identifier
             || hoveredTextSpoiler?.itemIdentifier == item.identifier
@@ -956,6 +953,7 @@ extension NativeTimelineCanvasView {
             showsCompactTimestamp: hoveredCompactTimestampRow == index,
             isAuthorHovered: hoveredAuthorMessageID == item.messageID,
             isServerTagHovered: hoveredServerTagMessageID == item.messageID || serverTagCardPresentation?.messageID == item.messageID,
+            isCommandPillHovered: hoveredCommandPillMessageID == item.messageID,
             hoveredMention: hoveredMention?.itemIdentifier == item.identifier ? hoveredMention : nil,
             hoveredTextLink: hoveredTextLink?.itemIdentifier == item.identifier ? hoveredTextLink : nil,
             hoveredTextSpoiler: hoveredTextSpoiler?.itemIdentifier == item.identifier ? hoveredTextSpoiler : nil,
@@ -967,6 +965,7 @@ extension NativeTimelineCanvasView {
             threadCardInteraction: threadCardInteraction(forMessageID: item.messageID),
             isEphemeralDismissHovered: hoveredFooterAction?.messageID == item.messageID && hoveredFooterAction?.kind == .ephemeralDismiss,
             isTranslationActionHovered: hoveredFooterAction?.messageID == item.messageID && hoveredFooterAction?.kind == .translation,
+            hoveredDeliveryAction: hoveredFooterAction?.messageID == item.messageID ? hoveredFooterAction?.kind : nil,
             isSuppressedToggleHovered: isSuppressedToggleHovered(item),
             hoveredReactionID: hoveredReactionID(inMessageAt: index),
             isAddReactionHovered: isAddReactionHovered(inMessageAt: index),
@@ -975,7 +974,7 @@ extension NativeTimelineCanvasView {
             spoilerRevealStore: spoilerRevealStore,
             reactionCountTransitions: reactionCountTransitions(inMessageAt: index),
             pollPresentation: pollPresentation(for: item.messageID),
-            animatedReactionIDs: animatedReactionIDs(for: item.identifier)
+            animatedOverlayRoles: animatedOverlayRoles(for: item.identifier)
         )
     }
 
@@ -1030,7 +1029,7 @@ extension NativeTimelineCanvasView {
                     item: item, layout: layouts[index], in: rowFrame, model: model,
                     isHovered: false, revealedTextSpoilerState: revealState,
                     spoilerRevealStore: spoilerRevealStore,
-                    animatedReactionIDs: animatedReactionIDs(for: item.identifier)
+                    animatedOverlayRoles: animatedOverlayRoles(for: item.identifier)
                 )
             }
         } else {
@@ -1413,7 +1412,7 @@ extension NativeTimelineCanvasView {
                 model: model,
                 isHovered: false,
                 spoilerRevealStore: spoilerRevealStore,
-                animatedReactionIDs: animatedReactionIDs(for: item.identifier)
+                animatedOverlayRoles: animatedOverlayRoles(for: item.identifier)
             )
         }
         flippedGraphics.flushGraphics()

@@ -310,6 +310,8 @@ public enum StickerFormat: Int, Codable, Hashable, Sendable {
     case apng = 2
     case lottie = 3
     case gif = 4
+
+    public var isAnimated: Bool { self != .png }
 }
 
 public struct MessageSticker: Identifiable, Codable, Hashable, Sendable {
@@ -671,7 +673,8 @@ public struct GIFPickerLanding: Codable, Hashable, Sendable {
 public enum MessageSendProgress: Equatable, Sendable {
     case preparing
     case reserving(files: Int)
-    case uploading(fileName: String, completed: Int64, total: Int64)
+    /// `fileID` is the draft attachment's ID, absent for files sent without a draft.
+    case uploading(fileID: UUID?, fileName: String, completed: Int64, total: Int64)
     case submitting
     case awaitingReconciliation(nonce: String)
     case completed(messageID: MessageID)

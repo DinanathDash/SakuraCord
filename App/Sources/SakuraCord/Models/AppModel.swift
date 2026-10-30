@@ -168,6 +168,7 @@ final class AppModel {
     @ObservationIgnored let friends = FriendsState()
     @ObservationIgnored let ignoredUsers = IgnoredUsersState()
     @ObservationIgnored let serverTagCards = ServerTagCardStore()
+    @ObservationIgnored let messageInteractionData = MessageInteractionDataStore()
     @ObservationIgnored let issueReports = IssueReportStore()
     @ObservationIgnored let nicknameEditor = NicknameEditorStore()
     @ObservationIgnored let groupDirectMessageEditor = GroupDirectMessageEditorStore()
@@ -479,6 +480,7 @@ final class AppModel {
     var canRetryThreadLoad: Bool { threadErrorScope.map { $0 != .action } ?? false }
     @ObservationIgnored let composer: MessageComposerState
     @ObservationIgnored let voiceMessagePlayback = VoiceMessagePlaybackStore()
+    @ObservationIgnored let attachmentUploads = AttachmentUploadProgressStore()
     @ObservationIgnored let channelVoiceMessageComposer = VoiceMessageComposerState(destination: .channel)
     @ObservationIgnored let threadVoiceMessageComposer = VoiceMessageComposerState(destination: .thread)
     var gifResults: [GIFSearchResult] = []

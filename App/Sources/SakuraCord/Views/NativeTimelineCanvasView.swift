@@ -57,18 +57,6 @@ final class NativeTimelineCanvasView: NSView, WindowModalInputParticipant {
         let url: URL
     }
 
-    struct LottieStickerOverlayKey: Hashable {
-        let row: NativeMessageTimelineItem.Identifier
-        let stickerID: String
-        let url: URL
-    }
-
-    struct DesiredLottieStickerOverlay {
-        let key: LottieStickerOverlayKey
-        let frame: CGRect
-        let opacity: CGFloat
-    }
-
     enum AnimatedMediaOverlayRole: Hashable {
         case authorAvatar
         case authorAvatarDecoration
@@ -95,6 +83,14 @@ final class NativeTimelineCanvasView: NSView, WindowModalInputParticipant {
                 true
             default:
                 false
+            }
+        }
+
+        /// Whether the row paints nothing beneath this overlay once it is live.
+        var replacesPoster: Bool {
+            switch self {
+            case .sticker, .reaction: true
+            default: false
             }
         }
     }
@@ -330,12 +326,8 @@ final class NativeTimelineCanvasView: NSView, WindowModalInputParticipant {
         [NativeMessageTimelineItem.Identifier: Set<NativeTimelineMediaKey>] = [:]
     var inlineVideoRows:
         [NativeMessageTimelineItem.Identifier: Set<URL>] = [:]
-    var lottieStickerRows:
-        [NativeMessageTimelineItem.Identifier: Set<URL>] = [:]
     var inlineVideoOverlays:
         [InlineVideoOverlayKey: NativeTimelineInlineVideoOverlay] = [:]
-    var lottieStickerOverlays:
-        [LottieStickerOverlayKey: NativeTimelineLottieStickerOverlay] = [:]
     var animatedMediaOverlays:
         [AnimatedMediaOverlayKey: NativeTimelineAnimatedMediaOverlay] = [:]
     var voiceMessageOverlay: NativeTimelineVoiceMessageOverlay?
@@ -418,6 +410,8 @@ final class NativeTimelineCanvasView: NSView, WindowModalInputParticipant {
                                        name: NSMenu.didEndTrackingNotification, object: nil)
         notificationCenter.addObserver(self, selector: #selector(voiceMessagePlaybackDidChange(_:)),
                                        name: VoiceMessagePlaybackStore.didChange, object: nil)
+        notificationCenter.addObserver(self, selector: #selector(attachmentUploadsDidChange(_:)),
+                                       name: AttachmentUploadProgressStore.didChange, object: nil)
         NSWorkspace.shared.notificationCenter.addObserver(
             self,
             selector: #selector(mediaPlaybackVisibilityDidChange(_:)),
@@ -519,6 +513,7 @@ enum NativeTimelineRowPainter {
         showsCompactTimestamp: Bool = false,
         isAuthorHovered: Bool = false,
         isServerTagHovered: Bool = false,
+        isCommandPillHovered: Bool = false,
         hoveredMention: NativeTimelineMentionHover? = nil,
         hoveredTextLink: NativeTimelineTextLinkHover? = nil,
         hoveredTextSpoiler: NativeTimelineTextSpoilerHover? = nil,
@@ -533,6 +528,7 @@ enum NativeTimelineRowPainter {
         threadCardInteraction: NativeTimelineThreadCard.Interaction = .idle,
         isEphemeralDismissHovered: Bool = false,
         isTranslationActionHovered: Bool = false,
+        hoveredDeliveryAction: NativeTimelineFooterActionTarget.Kind? = nil,
         isSuppressedToggleHovered: Bool = false,
         hidesMessageContent: Bool = false,
         hoveredReactionID: String? = nil,
@@ -544,7 +540,7 @@ enum NativeTimelineRowPainter {
         reactionCountTransitions:
             [String: NativeTimelineReactionCountTransition] = [:],
         pollPresentation: NativeTimelinePollPresentation = .init(),
-        animatedReactionIDs: Set<String> = []
+        animatedOverlayRoles: Set<NativeTimelineCanvasView.AnimatedMediaOverlayRole> = []
     ) {
         NSGraphicsContext.saveGraphicsState()
         let transform = NSAffineTransform()
@@ -574,7 +570,9 @@ enum NativeTimelineRowPainter {
         )
         switch item {
         case let .suppressedMessages(group):
-            if let day = group.day, let frame = layout.daySeparatorFrame { dateSeparator(date: day, frame: frame) }
+            if let day = group.day, let frame = layout.daySeparatorFrame {
+                dateSeparator(date: day, frame: frame, isUnread: layout.foldedUnreadDay != nil)
+            }
             if let frame = layout.unreadSeparatorFrame { newMessagesSeparator(frame: frame) }
             if let header = layout.suppressedHeader {
                 drawSuppressedHeader(group, layout: header, isToggleHovered: isSuppressedToggleHovered)
@@ -604,6 +602,7 @@ enum NativeTimelineRowPainter {
                 showsCompactTimestamp: showsCompactTimestamp,
                 isAuthorHovered: isAuthorHovered,
                 isServerTagHovered: isServerTagHovered,
+                isCommandPillHovered: isCommandPillHovered,
                 hoveredMention: hoveredMention,
                 hoveredTextLink: hoveredTextLink,
                 hoveredTextSpoiler: hoveredTextSpoiler,
@@ -616,6 +615,7 @@ enum NativeTimelineRowPainter {
                 threadCardInteraction: threadCardInteraction,
                 isEphemeralDismissHovered: isEphemeralDismissHovered,
                 isTranslationActionHovered: isTranslationActionHovered,
+                hoveredDeliveryAction: hoveredDeliveryAction,
                 hidesMessageContent: hidesMessageContent,
                 hoveredReactionID: hoveredReactionID,
                 isAddReactionHovered: isAddReactionHovered,
@@ -624,7 +624,7 @@ enum NativeTimelineRowPainter {
                     revealedTextSpoilerState,
                 spoilerRevealStore: spoilerRevealStore,
                 pollPresentation: pollPresentation,
-                animatedReactionIDs: animatedReactionIDs,
+                animatedOverlayRoles: animatedOverlayRoles,
                 reactionCountTransitions: reactionCountTransitions
             ))
         }
