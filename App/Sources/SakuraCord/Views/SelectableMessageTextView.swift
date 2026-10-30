@@ -13,6 +13,7 @@ nonisolated enum MentionTarget: Hashable, Sendable {
     case channel(ChannelID)
     case linkedChannel(guildID: GuildID?, channelID: ChannelID)
     case message(guildID: GuildID?, channelID: ChannelID, messageID: MessageID)
+    case timestamp(date: Date, style: String?)
 }
 
 nonisolated struct MentionPresentation: Hashable, Identifiable, Sendable {
@@ -22,9 +23,19 @@ nonisolated struct MentionPresentation: Hashable, Identifiable, Sendable {
     var avatarURL: URL?
     var colorHex: UInt32?
     var systemImage: String?
+    var toolTip: String?
 
     var id: String { rawToken }
-    var isInteractive: Bool { target != .unresolved }
+    var isInteractive: Bool {
+        switch target {
+        case .unresolved, .timestamp: false
+        default: true
+        }
+    }
+    var isTimestamp: Bool {
+        if case .timestamp = target { return true }
+        return false
+    }
 
     /// A link to a channel, thread or forum post the account does not know.
     static let unknownChannelLinkLabel = "unknown-channel"
@@ -103,6 +114,16 @@ nonisolated struct MentionPresentation: Hashable, Identifiable, Sendable {
                     messageID: messageID
                 ),
                 systemImage: "bubble.left.fill"
+            )
+        case .timestamp:
+            guard let date = mention.timestampDate else {
+                return unresolved(mention, label: mention.rawToken)
+            }
+            return MentionPresentation(
+                rawToken: mention.rawToken,
+                label: mention.formattedTimestamp,
+                target: .timestamp(date: date, style: mention.timestampStyle),
+                toolTip: mention.timestampTooltip
             )
         }
     }
@@ -644,6 +665,7 @@ final class RichMessageNSTextView: NSTextView {
     override func mouseExited(with event: NSEvent) {
         setHoveredMention(nil)
         clearHoveredLink()
+        toolTip = nil
         super.mouseExited(with: event)
     }
 
@@ -653,17 +675,24 @@ final class RichMessageNSTextView: NSTextView {
     }
 
     private func updateCursor(at point: NSPoint) {
-        if mentionAttachment(at: point) == nil, link(at: point) == nil {
-            NSCursor.iBeam.set()
-        } else {
+        if let (_, attachment) = mentionAttachment(at: point) {
+            if attachment.presentation.isInteractive {
+                NSCursor.pointingHand.set()
+            } else {
+                NSCursor.arrow.set()
+            }
+        } else if link(at: point) != nil {
             NSCursor.pointingHand.set()
+        } else {
+            NSCursor.iBeam.set()
         }
     }
 
     override func mouseDown(with event: NSEvent) {
         claimSelectionOwnership()
         if event.modifierFlags.isDisjoint(with: [.command, .shift, .option, .control]),
-           let (index, attachment) = mentionAttachment(at: convert(event.locationInWindow, from: nil))
+           let (index, attachment) = mentionAttachment(at: convert(event.locationInWindow, from: nil)),
+           attachment.presentation.isInteractive
         {
             let rawToken = attachment.presentation.rawToken
             guard let anchor = mentionPopoverAnchor(at: index, rawToken: rawToken) else { return }
@@ -682,7 +711,7 @@ final class RichMessageNSTextView: NSTextView {
         let index = layoutManager.characterIndexForGlyph(at: glyph)
         guard index < attributedString().length,
               let attachment = attributedString().attribute(.attachment, at: index, effectiveRange: nil)
-              as? MentionTextAttachment, attachment.presentation.isInteractive
+              as? MentionTextAttachment
         else { return nil }
         return (index, attachment)
     }
@@ -786,6 +815,13 @@ final class RichMessageNSTextView: NSTextView {
             guard let attachment = attributedString().attribute(.attachment, at: index, effectiveRange: nil)
                 as? MentionTextAttachment else { continue }
             attachment.image = index == location ? attachment.hoverImage : attachment.normalImage
+        }
+        if let location,
+           let attachment = attributedString().attribute(.attachment, at: location, effectiveRange: nil) as? MentionTextAttachment,
+           let tip = attachment.presentation.toolTip {
+            toolTip = tip
+        } else {
+            toolTip = nil
         }
         needsDisplay = true
     }

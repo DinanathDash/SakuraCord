@@ -613,3 +613,53 @@ private func spoilerOutline(_ source: String) -> String {
     #expect(code.attribute(.discordMarkdownInlineCode, at: 0, effectiveRange: nil) != nil)
     #expect(code.attribute(.discordMarkdownSpoiler, at: 0, effectiveRange: nil) != nil)
 }
+
+@Test func `message document recognizes discord timestamp tokens as structured mentions`() {
+    let source = "Event is at <t:1793160000:F> or relative <t:1793205468:R> and default <t:1793160000>"
+    let document = MessageDocument(source: source)
+    let mentions = document.segments.compactMap { segment -> RenderedMention? in
+        guard case let .mention(value) = segment else { return nil }
+        return value
+    }
+
+    #expect(mentions.count == 3)
+    #expect(mentions[0].kind == .timestamp)
+    #expect(mentions[0].id == "1793160000")
+    #expect(mentions[0].timestampStyle == "F")
+    #expect(mentions[0].timestampDate == Date(timeIntervalSince1970: 1793160000))
+    #expect(mentions[0].rawToken == "<t:1793160000:F>")
+
+    #expect(mentions[1].kind == .timestamp)
+    #expect(mentions[1].id == "1793205468")
+    #expect(mentions[1].timestampStyle == "R")
+    #expect(mentions[1].rawToken == "<t:1793205468:R>")
+
+    #expect(mentions[2].kind == .timestamp)
+    #expect(mentions[2].id == "1793160000")
+    #expect(mentions[2].timestampStyle == nil)
+    #expect(mentions[2].rawToken == "<t:1793160000>")
+
+    #expect(!document.isEmojiOnly)
+}
+
+@Test func `discord timestamp formatter formats expected styles and tooltips`() {
+    let date = Date(timeIntervalSince1970: 1793160000)
+    let reference = Date(timeIntervalSince1970: 1793160000 + 3600)
+
+    let shortTime = DiscordTimestampFormatter.formatted(date: date, style: "t", locale: Locale(identifier: "en_US"))
+    let longDate = DiscordTimestampFormatter.formatted(date: date, style: "D", locale: Locale(identifier: "en_US"))
+    let defaultFormat = DiscordTimestampFormatter.formatted(date: date, style: nil, locale: Locale(identifier: "en_US"))
+    let fullFormat = DiscordTimestampFormatter.formatted(date: date, style: "F", locale: Locale(identifier: "en_US"))
+    let relative = DiscordTimestampFormatter.relativeText(for: date, relativeTo: reference)
+
+    #expect(!shortTime.isEmpty)
+    #expect(!longDate.isEmpty)
+    #expect(!defaultFormat.isEmpty)
+    #expect(!fullFormat.isEmpty)
+    #expect(relative.contains("hour") || relative.contains("hr"))
+
+    let tooltipForRelative = DiscordTimestampFormatter.tooltip(date: date, style: "R", now: reference, locale: Locale(identifier: "en_US"))
+    #expect(tooltipForRelative == fullFormat)
+    let tooltipForStandard = DiscordTimestampFormatter.tooltip(date: date, style: "f", now: reference, locale: Locale(identifier: "en_US"))
+    #expect(tooltipForStandard.contains("hour") || tooltipForStandard.contains("hr"))
+}

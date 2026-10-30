@@ -893,6 +893,15 @@ extension NativeTimelineRowPainter {
         isHovered: Bool,
         isOutgoingBubble: Bool = false
     ) {
+        if presentation.isTimestamp {
+            drawTimestamp(
+                presentation,
+                in: frame,
+                isHovered: isHovered,
+                isOutgoingBubble: isOutgoingBubble
+            )
+            return
+        }
         let color: NSColor = isOutgoingBubble
             ? .white : roleColor(presentation.colorHex) ?? .sakuraCordAccentColor
         let shape = NSBezierPath(
@@ -978,6 +987,39 @@ extension NativeTimelineRowPainter {
             ),
             font: .interfaceSystemFont(ofSize: 15, weight: .semibold),
             color: color
+        )
+    }
+
+    static func drawTimestamp(
+        _ presentation: MentionPresentation,
+        in frame: CGRect,
+        isHovered: Bool,
+        isOutgoingBubble: Bool = false
+    ) {
+        let shape = NSBezierPath(
+            concentricRoundedRect: frame,
+            cornerRadius: InterfaceScale.metric(4.5)
+        )
+        if isOutgoingBubble {
+            NSColor.black.withAlphaComponent(isHovered ? 0.35 : 0.22).setFill()
+        } else {
+            NSColor.white.withAlphaComponent(isHovered ? 0.14 : 0.08).setFill()
+        }
+        shape.fill()
+
+        let metrics = NativeTimelineMentionMetrics.self
+        let labelX = frame.minX + metrics.horizontalPadding
+        let textColor: NSColor = isOutgoingBubble ? .white : .labelColor
+        text(
+            presentation.label,
+            in: CGRect(
+                x: labelX,
+                y: frame.minY,
+                width: max(1, frame.maxX - labelX - metrics.horizontalPadding),
+                height: frame.height
+            ),
+            font: .interfaceSystemFont(ofSize: 15, weight: .regular),
+            color: textColor
         )
     }
 

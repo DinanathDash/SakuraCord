@@ -519,7 +519,7 @@ nonisolated enum NativeTimelineCoreText {
     ) -> (width: CGFloat, height: CGFloat) {
         let labelFont = NSFont.systemFont(
             ofSize: font.pointSize,
-            weight: .semibold
+            weight: presentation.isTimestamp ? .regular : .semibold
         )
         let labelWidth = ceil(
             (presentation.label as NSString).size(

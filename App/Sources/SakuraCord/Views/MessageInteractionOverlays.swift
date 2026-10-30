@@ -725,6 +725,7 @@ enum MessageReplySummary {
         case .channel: "#unknown-channel"
         case .channelLink: "Channel link"
         case .message: "Message link"
+        case .timestamp: mention.formattedTimestamp
         }
     }
 

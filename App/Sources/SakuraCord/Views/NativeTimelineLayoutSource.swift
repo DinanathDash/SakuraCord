@@ -115,6 +115,7 @@ private struct AppModelMentionResolver {
         case .channel: channelPresentation(mention)
         case .channelLink: channelLinkPresentation(mention)
         case .message: messagePresentation(mention)
+        case .timestamp: MentionPresentation.fallback(for: mention)
         }
     }
 

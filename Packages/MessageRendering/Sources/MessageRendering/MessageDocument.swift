@@ -59,10 +59,10 @@ public struct RenderedMention: Codable, Hashable, Sendable {
     )
 
     public enum Kind: String, Codable, Hashable, Sendable {
-        case user, role, channel, channelLink, message, guildNavigation
+        case user, role, channel, channelLink, message, guildNavigation, timestamp
     }
 
-    public static let tokenPattern = #"<id:(?:guide|browse|customize)>|"#
+    public static let tokenPattern = #"<id:(?:guide|browse|customize)>|<t:-?[0-9]+(?::[A-Za-z])?>|"#
         + #"<@!?[0-9]+>|<@&[0-9]+>|<#[0-9]+>|https?://(?:(?:canary|ptb|www)\.)?discord(?:app)?\.com/channels/(?:@me|[0-9]+)/[0-9]+(?:/[0-9]+)?"#
 
     public var id: String
@@ -70,8 +70,23 @@ public struct RenderedMention: Codable, Hashable, Sendable {
     public var rawToken: String
     public var messageGuildID: String?
     public var messageChannelID: String?
+    public var timestampStyle: String?
 
     public init?(rawToken: String) {
+        if rawToken.hasPrefix("<t:"), rawToken.hasSuffix(">") {
+            let inner = rawToken.dropFirst(3).dropLast()
+            let parts = inner.split(separator: ":", maxSplits: 1, omittingEmptySubsequences: false)
+            guard !parts.isEmpty, let seconds = Int64(parts[0]) else { return nil }
+            guard parts.count == 1 || (parts.count == 2 && parts[1].count == 1) else { return nil }
+            id = String(seconds)
+            kind = .timestamp
+            self.rawToken = rawToken
+            messageGuildID = nil
+            messageChannelID = nil
+            timestampStyle = parts.count > 1 ? String(parts[1]) : nil
+            return
+        }
+
         if rawToken.hasPrefix("<id:"), rawToken.hasSuffix(">"),
            let destination = GuildNavigationMention(rawValue: String(rawToken.dropFirst(4).dropLast())) {
             id = destination.rawValue
@@ -79,6 +94,7 @@ public struct RenderedMention: Codable, Hashable, Sendable {
             self.rawToken = rawToken
             messageGuildID = nil
             messageChannelID = nil
+            timestampStyle = nil
             return
         }
 
@@ -96,6 +112,7 @@ public struct RenderedMention: Codable, Hashable, Sendable {
             self.rawToken = rawToken
             messageGuildID = nil
             messageChannelID = nil
+            timestampStyle = nil
             return
         }
 
@@ -116,6 +133,22 @@ public struct RenderedMention: Codable, Hashable, Sendable {
         self.rawToken = rawToken
         messageGuildID = components[1] == "@me" ? nil : components[1]
         messageChannelID = components[2]
+        timestampStyle = nil
+    }
+
+    public var timestampDate: Date? {
+        guard kind == .timestamp, let seconds = Int64(id) else { return nil }
+        return Date(timeIntervalSince1970: TimeInterval(seconds))
+    }
+
+    public var formattedTimestamp: String {
+        guard kind == .timestamp, let seconds = Int64(id) else { return rawToken }
+        return DiscordTimestampFormatter.formatted(seconds: seconds, style: timestampStyle)
+    }
+
+    public var timestampTooltip: String? {
+        guard kind == .timestamp, let seconds = Int64(id) else { return nil }
+        return DiscordTimestampFormatter.tooltip(seconds: seconds, style: timestampStyle)
     }
 
     private static let messageLinkHosts: Set<String> = [

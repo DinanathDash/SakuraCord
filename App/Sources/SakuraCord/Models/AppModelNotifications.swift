@@ -161,6 +161,8 @@ extension AppModel {
             return "#\(channel?.name ?? "unknown-channel")"
         case .message:
             return "Message link"
+        case .timestamp:
+            return mention.formattedTimestamp
         }
     }
 

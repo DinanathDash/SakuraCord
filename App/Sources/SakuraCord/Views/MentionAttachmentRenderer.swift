@@ -78,6 +78,9 @@ enum MentionAttachmentRenderer {
         avatar: NSImage?,
         hovered: Bool
     ) -> NSImage {
+        if presentation.isTimestamp {
+            return timestampImage(presentation: presentation, font: font, hovered: hovered)
+        }
         let labelFont = NSFont.systemFont(ofSize: font.pointSize, weight: .semibold)
         let label = presentation.label as NSString
         let attributes: [NSAttributedString.Key: Any] = [.font: labelFont]
@@ -172,6 +175,40 @@ enum MentionAttachmentRenderer {
             ]
             let textY = floor((height - labelSize.height) / 2)
             label.draw(at: NSPoint(x: textX, y: textY), withAttributes: textAttributes)
+            return true
+        }
+        image.accessibilityDescription = presentation.label
+        return image
+    }
+
+    private static func timestampImage(
+        presentation: MentionPresentation,
+        font: NSFont,
+        hovered: Bool
+    ) -> NSImage {
+        let labelFont = NSFont.systemFont(ofSize: font.pointSize, weight: .regular)
+        let label = presentation.label as NSString
+        let attributes: [NSAttributedString.Key: Any] = [.font: labelFont]
+        let labelSize = label.size(withAttributes: attributes)
+        let height = max(21, ceil(font.pointSize + 6))
+        let horizontalPadding: CGFloat = InterfaceScale.metric(6)
+        let width = ceil(horizontalPadding * 2 + labelSize.width)
+        let size = NSSize(width: width, height: height)
+        let image = NSImage(size: size, flipped: false) { bounds in
+            let background = NSColor.white.withAlphaComponent(hovered ? 0.14 : 0.08)
+            let shape = NSBezierPath(
+                concentricRoundedRect: bounds,
+                cornerRadius: InterfaceScale.metric(4.5)
+            )
+            background.setFill()
+            shape.fill()
+
+            let textAttributes: [NSAttributedString.Key: Any] = [
+                .font: labelFont,
+                .foregroundColor: NSColor.labelColor
+            ]
+            let textY = floor((height - labelSize.height) / 2)
+            label.draw(at: NSPoint(x: horizontalPadding, y: textY), withAttributes: textAttributes)
             return true
         }
         image.accessibilityDescription = presentation.label

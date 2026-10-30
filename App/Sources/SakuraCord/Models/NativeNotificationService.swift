@@ -177,6 +177,7 @@ nonisolated struct NotificationContentPresentation: Equatable, Sendable {
         case .role: "@unknown-role"
         case .channel, .channelLink: "#unknown-channel"
         case .message: "Message link"
+        case .timestamp: mention.formattedTimestamp
         }
     }
 }
