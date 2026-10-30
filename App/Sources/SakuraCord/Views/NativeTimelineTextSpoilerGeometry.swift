@@ -149,14 +149,6 @@ enum SelectableTextSpoilerGeometry {
                 return range
             }
         }
-        var location = point
-        location.x -= origin.x
-        location.y -= origin.y
-        let glyph = manager.glyphIndex(for: location, in: container)
-        let index = manager.characterIndexForGlyph(at: glyph)
-        if index < storage.length, let range = NativeTimelineTextSpoilers.range(at: index, in: storage) {
-            return range
-        }
         return nil
     }
 

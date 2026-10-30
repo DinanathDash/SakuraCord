@@ -162,7 +162,6 @@ struct SelectableMessageTextView: NSViewRepresentable {
         textView.onMentionClick = onMentionClick
         textView.onURLClick = onURLClick
         textView.onRevealSpoiler = onRevealSpoiler
-        textView.revealedSpoilerLocations = revealedSpoilerLocations
         textView.model = model
         return textView
     }
@@ -171,7 +170,6 @@ struct SelectableMessageTextView: NSViewRepresentable {
         textView.onMentionClick = onMentionClick
         textView.onURLClick = onURLClick
         textView.onRevealSpoiler = onRevealSpoiler
-        textView.revealedSpoilerLocations = revealedSpoilerLocations
         textView.model = model
         textView.isSelectable = isSelectable
         textView.applySakuraCordTextSelectionAppearance()
@@ -564,7 +562,6 @@ final class RichMessageNSTextView: NSTextView {
     var onMentionClick: (MentionPresentation, StablePopoverAnchor) -> Void = { _, _ in }
     var onURLClick: (URL) -> Bool = { _ in false }
     var onRevealSpoiler: (Int) -> Void = { _ in }
-    var revealedSpoilerLocations: Set<Int> = []
     private var hoveredMentionLocation: Int?
     private var hoveredLinkRange: NSRange?
     private var mentionTrackingArea: NSTrackingArea?
@@ -691,7 +688,6 @@ final class RichMessageNSTextView: NSTextView {
     }
 
     func revealSpoiler(at location: Int) {
-        revealedSpoilerLocations.insert(location)
         onRevealSpoiler(location)
     }
 

@@ -733,7 +733,7 @@ enum NativeTimelineRowPainter {
                 // AppKit applies a configured palette color's alpha again
                 // while rasterizing this hierarchical symbol. The square
                 // root preserves SwiftUI's 55% secondary foreground result.
-                paletteColors: [\
+                paletteColors: [
                     NSColor.labelColor.withAlphaComponent(0.74)
                 ]
             )
