@@ -565,6 +565,22 @@ struct ComposerView: View {
                 ApplicationCommandHelpStrip(draft: draft, issue: commandComposer.fieldIssue, cancel: cancelCommand)
                     .commandPanelSurface(cornerRadius: commandPanelCornerRadius)
             }
+        } else if let context = timeMentionContext, !timeCandidates.isEmpty {
+            VStack(spacing: 0) {
+                TimeFormatsAutocompleteList(
+                    heading: context.query.isEmpty ? "Time formats" : "Time formats for \(context.query.lowercased())",
+                    candidates: timeCandidates,
+                    selectedIndex: autocompleteIndex,
+                    highlight: { autocompleteIndex = $0 },
+                    select: { option in
+                        acceptTimeFormat(option, context: context)
+                    },
+                    cornerRadius: commandPanelCornerRadius,
+                    keyboardSelectionRevision: autocompleteKeyboardSelectionRevision
+                )
+                TimeMentionHelpStrip(cancel: { isAutocompleteDismissed = true })
+                    .commandPanelSurface(cornerRadius: commandPanelCornerRadius)
+            }
         } else if let context = mentionAutocompleteContext {
             let suggestions = mentionAutocompleteSuggestions(for: context)
             if !suggestions.isEmpty {
@@ -811,73 +827,6 @@ struct ComposerView: View {
         model.mediaViewerPresentation = presentation
     }
 
-    private var autocompleteContext: ColonAutocompleteContext? {
-        guard !isAutocompleteDismissed else { return nil }
-        return ColonAutocompleteContext(text: draft, selection: draftSelection)
-    }
-
-    private var mentionAutocompleteContext: MentionAutocompleteContext? {
-        guard !isAutocompleteDismissed else { return nil }
-        return MentionAutocompleteContext(text: draft, selection: draftSelection)
-    }
-
-    private var mentionAutocompleteSuggestions: [MentionAutocompleteSuggestion] {
-        guard let context = mentionAutocompleteContext else { return [] }
-        return mentionAutocompleteSuggestions(for: context)
-    }
-
-    private func mentionAutocompleteSuggestions(
-        for context: MentionAutocompleteContext
-    ) -> [MentionAutocompleteSuggestion] {
-        switch context.kind {
-        case .member:
-            return MentionAutocompleteSuggestionFactory.memberSuggestions(
-                query: context.query,
-                recentMessages: activeMessages.filter { !model.isMessageSuppressed($0) },
-                localMembers: model.mentionAutocompleteMembers.filter { !model.isUserIgnored($0.id) },
-                remoteMembers: model.mentionMemberResults.filter { !model.isUserIgnored($0.id) },
-                roles: model.guildRoles,
-                canMentionNonMentionableRoles:
-                MentionAutocompleteSuggestionFactory.canMentionNonMentionableRoles(
-                    in: model.selectedChannel,
-                    guild: model.selectedGuildID.flatMap { model.serverRailGuildsByID[$0] },
-                    currentUserID: model.currentUser?.id,
-                    currentMember: (model.currentUser?.id).flatMap {
-                        model.membersByID[$0]
-                    },
-                    roles: model.guildRoles
-                )
-            )
-        case .channel:
-            return MentionAutocompleteSuggestionFactory.channelSuggestions(
-                query: context.query,
-                channels: model.visibleChannels,
-                guilds: model.serverRailGuildsByID,
-                guildAndChannelUsageScores: model.discordGuildAndChannelUsageScores,
-                currentUserID: model.currentUser?.id,
-                currentMember: (model.currentUser?.id).flatMap { model.membersByID[$0] },
-                roles: model.guildRoles
-            )
-        }
-    }
-
-    private var composerMentionPresentations: [String: MentionPresentation] {
-        let resolver = MessageMentionResolver(model: model)
-        return MessageDocumentCache.shared.document(for: draft).segments.reduce(into: [:]) { values, segment in
-            if case let .mention(mention) = segment {
-                values[mention.rawToken] = resolver.presentation(mention)
-            }
-        }
-    }
-
-    private func updateMentionMemberSearch() {
-        guard let context = mentionAutocompleteContext, context.kind == .member else {
-            model.requestMentionMemberSearch(query: "")
-            return
-        }
-        model.requestMentionMemberSearch(query: context.query)
-    }
-
     private var emojiAutocompleteCatalogIsRequested: Bool {
         autocompleteContext != nil
     }
@@ -1079,6 +1028,9 @@ struct ComposerView: View {
         if supportsCommands, commandComposer.isPickerPresented {
             return handleCommandPickerAutocomplete(command)
         }
+        if let context = timeMentionContext, !allTimeOptions.isEmpty {
+            return handleTimeAutocomplete(command, context: context)
+        }
         if let context = mentionAutocompleteContext, !mentionAutocompleteSuggestions.isEmpty {
             return handleMentionAutocomplete(command, context: context)
         }
@@ -1139,73 +1091,6 @@ struct ComposerView: View {
         case .previousField, .nextField, .removeField: return true
         }
         return true
-    }
-
-    private func handleMentionAutocomplete(
-        _ command: ComposerAutocompleteCommand,
-        context: MentionAutocompleteContext
-    ) -> Bool {
-        if command == .previous || command == .next { autocompleteKeyboardSelectionRevision &+= 1 }
-        switch command {
-        case .previous:
-            autocompleteIndex = (autocompleteIndex - 1 + mentionAutocompleteSuggestions.count)
-                % mentionAutocompleteSuggestions.count
-        case .next:
-            autocompleteIndex = (autocompleteIndex + 1) % mentionAutocompleteSuggestions.count
-        case .accept, .advance:
-            acceptMentionAutocomplete(
-                mentionAutocompleteSuggestions[min(autocompleteIndex, mentionAutocompleteSuggestions.count - 1)],
-                context: context
-            )
-        case .dismiss:
-            isAutocompleteDismissed = true
-        case .previousField, .nextField, .removeField:
-            return false
-        }
-        return true
-    }
-
-    private func handleColonAutocomplete(
-        _ command: ComposerAutocompleteCommand,
-        context: ColonAutocompleteContext
-    ) -> Bool {
-        if command == .previous || command == .next { autocompleteKeyboardSelectionRevision &+= 1 }
-        switch command {
-        case .previous:
-            autocompleteIndex =
-                (autocompleteIndex - 1 + autocompleteSuggestions.count) % autocompleteSuggestions.count
-        case .next: autocompleteIndex = (autocompleteIndex + 1) % autocompleteSuggestions.count
-        case .accept, .advance:
-            acceptAutocomplete(
-                autocompleteSuggestions[min(autocompleteIndex, autocompleteSuggestions.count - 1)],
-                context: context
-            )
-        case .dismiss: isAutocompleteDismissed = true
-        case .previousField, .nextField, .removeField: return false
-        }
-        return true
-    }
-
-    private func acceptAutocomplete(
-        _ suggestion: ColonAutocompleteSuggestion, context: ColonAutocompleteContext
-    ) {
-        if let emoji = suggestion.customEmoji {
-            ComposerEmojiImageStore.shared.register(emoji)
-        }
-        let result = insertInDraft(suggestion.value, replacing: context.range)
-        draftSelection = result
-        autocompleteIndex = 0
-        isAutocompleteDismissed = true
-    }
-
-    private func acceptMentionAutocomplete(
-        _ suggestion: MentionAutocompleteSuggestion,
-        context: MentionAutocompleteContext
-    ) {
-        if let member = suggestion.member { model.rememberMentionMember(member) }
-        draftSelection = insertInDraft(suggestion.value + " ", replacing: context.range)
-        autocompleteIndex = 0
-        isAutocompleteDismissed = true
     }
 
     @discardableResult
@@ -1599,5 +1484,191 @@ private extension ComposerView {
         focusedColumnPresentation = columnPresentation
         isFocused = false
         await Task.yield()
+    }
+}
+private extension ComposerView {
+    private var autocompleteContext: ColonAutocompleteContext? {
+        guard !isAutocompleteDismissed else { return nil }
+        return ColonAutocompleteContext(text: draft, selection: draftSelection)
+    }
+
+    private var timeMentionContext: TimeMentionContext? {
+        guard !isAutocompleteDismissed else { return nil }
+        return TimeMentionContext(text: draft, selection: draftSelection)
+    }
+
+    private var timeCandidates: [DiscordParsedTimeCandidate] {
+        guard let context = timeMentionContext else { return [] }
+        return DiscordNaturalLanguageTimeParser.candidates(for: context.query)
+    }
+
+    private var allTimeOptions: [DiscordParsedTimeCandidate.Option] {
+        timeCandidates.flatMap(\.options)
+    }
+
+    private var mentionAutocompleteContext: MentionAutocompleteContext? {
+        guard !isAutocompleteDismissed else { return nil }
+        return MentionAutocompleteContext(text: draft, selection: draftSelection)
+    }
+
+    private var mentionAutocompleteSuggestions: [MentionAutocompleteSuggestion] {
+        guard let context = mentionAutocompleteContext else { return [] }
+        return mentionAutocompleteSuggestions(for: context)
+    }
+
+    private func mentionAutocompleteSuggestions(
+        for context: MentionAutocompleteContext
+    ) -> [MentionAutocompleteSuggestion] {
+        switch context.kind {
+        case .member:
+            return MentionAutocompleteSuggestionFactory.memberSuggestions(
+                query: context.query,
+                recentMessages: activeMessages.filter { !model.isMessageSuppressed($0) },
+                localMembers: model.mentionAutocompleteMembers.filter { !model.isUserIgnored($0.id) },
+                remoteMembers: model.mentionMemberResults.filter { !model.isUserIgnored($0.id) },
+                roles: model.guildRoles,
+                canMentionNonMentionableRoles:
+                MentionAutocompleteSuggestionFactory.canMentionNonMentionableRoles(
+                    in: model.selectedChannel,
+                    guild: model.selectedGuildID.flatMap { model.serverRailGuildsByID[$0] },
+                    currentUserID: model.currentUser?.id,
+                    currentMember: (model.currentUser?.id).flatMap {
+                        model.membersByID[$0]
+                    },
+                    roles: model.guildRoles
+                )
+            )
+        case .channel:
+            return MentionAutocompleteSuggestionFactory.channelSuggestions(
+                query: context.query,
+                channels: model.visibleChannels,
+                guilds: model.serverRailGuildsByID,
+                guildAndChannelUsageScores: model.discordGuildAndChannelUsageScores,
+                currentUserID: model.currentUser?.id,
+                currentMember: (model.currentUser?.id).flatMap { model.membersByID[$0] },
+                roles: model.guildRoles
+            )
+        }
+    }
+
+    private var composerMentionPresentations: [String: MentionPresentation] {
+        let resolver = MessageMentionResolver(model: model)
+        return MessageDocumentCache.shared.document(for: draft).segments.reduce(into: [:]) { values, segment in
+            if case let .mention(mention) = segment {
+                values[mention.rawToken] = resolver.presentation(mention)
+            }
+        }
+    }
+
+    private func updateMentionMemberSearch() {
+        guard let context = mentionAutocompleteContext, context.kind == .member else {
+            model.requestMentionMemberSearch(query: "")
+            return
+        }
+        model.requestMentionMemberSearch(query: context.query)
+    }
+
+    private func handleMentionAutocomplete(
+        _ command: ComposerAutocompleteCommand,
+        context: MentionAutocompleteContext
+    ) -> Bool {
+        if command == .previous || command == .next { autocompleteKeyboardSelectionRevision &+= 1 }
+        switch command {
+        case .previous:
+            autocompleteIndex = (autocompleteIndex - 1 + mentionAutocompleteSuggestions.count)
+                % mentionAutocompleteSuggestions.count
+        case .next:
+            autocompleteIndex = (autocompleteIndex + 1) % mentionAutocompleteSuggestions.count
+        case .accept, .advance:
+            acceptMentionAutocomplete(
+                mentionAutocompleteSuggestions[min(autocompleteIndex, mentionAutocompleteSuggestions.count - 1)],
+                context: context
+            )
+        case .dismiss:
+            isAutocompleteDismissed = true
+        case .previousField, .nextField, .removeField:
+            return false
+        }
+        return true
+    }
+
+    private func handleColonAutocomplete(
+        _ command: ComposerAutocompleteCommand,
+        context: ColonAutocompleteContext
+    ) -> Bool {
+        if command == .previous || command == .next { autocompleteKeyboardSelectionRevision &+= 1 }
+        switch command {
+        case .previous:
+            autocompleteIndex =
+                (autocompleteIndex - 1 + autocompleteSuggestions.count) % autocompleteSuggestions.count
+        case .next: autocompleteIndex = (autocompleteIndex + 1) % autocompleteSuggestions.count
+        case .accept, .advance:
+            acceptAutocomplete(
+                autocompleteSuggestions[min(autocompleteIndex, autocompleteSuggestions.count - 1)],
+                context: context
+            )
+        case .dismiss: isAutocompleteDismissed = true
+        case .previousField, .nextField, .removeField: return false
+        }
+        return true
+    }
+
+    private func acceptAutocomplete(
+        _ suggestion: ColonAutocompleteSuggestion, context: ColonAutocompleteContext
+    ) {
+        if let emoji = suggestion.customEmoji {
+            ComposerEmojiImageStore.shared.register(emoji)
+        }
+        let result = insertInDraft(suggestion.value, replacing: context.range)
+        draftSelection = result
+        autocompleteIndex = 0
+        isAutocompleteDismissed = true
+    }
+
+    private func handleTimeAutocomplete(
+        _ command: ComposerAutocompleteCommand,
+        context: TimeMentionContext
+    ) -> Bool {
+        let options = allTimeOptions
+        guard !options.isEmpty else { return false }
+        if command == .previous || command == .next { autocompleteKeyboardSelectionRevision &+= 1 }
+        switch command {
+        case .previous:
+            autocompleteIndex = (autocompleteIndex - 1 + options.count) % options.count
+            return true
+        case .next:
+            autocompleteIndex = (autocompleteIndex + 1) % options.count
+            return true
+        case .accept, .advance:
+            acceptTimeFormat(
+                options[min(autocompleteIndex, options.count - 1)],
+                context: context
+            )
+            return true
+        case .dismiss:
+            isAutocompleteDismissed = true
+            return true
+        default:
+            return false
+        }
+    }
+
+    private func acceptTimeFormat(
+        _ option: DiscordParsedTimeCandidate.Option,
+        context: TimeMentionContext
+    ) {
+        draftSelection = insertInDraft(option.markdownToken + " ", replacing: context.range)
+        autocompleteIndex = 0
+        isAutocompleteDismissed = true
+    }
+
+    private func acceptMentionAutocomplete(
+        _ suggestion: MentionAutocompleteSuggestion,
+        context: MentionAutocompleteContext
+    ) {
+        if let member = suggestion.member { model.rememberMentionMember(member) }
+        draftSelection = insertInDraft(suggestion.value + " ", replacing: context.range)
+        autocompleteIndex = 0
+        isAutocompleteDismissed = true
     }
 }

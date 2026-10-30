@@ -47,8 +47,13 @@ struct MentionAutocompleteRow: View {
     @ViewBuilder
     private var leadingVisual: some View {
         switch suggestion.target {
-        case .unresolved, .timestamp:
+        case .unresolved:
             EmptyView()
+        case .timestamp:
+            Image(systemName: suggestion.systemImage ?? "clock")
+                .font(.interfaceSystem(size: 17, weight: .semibold))
+                .foregroundStyle(.secondary)
+                .frame(width: InterfaceScale.metric(28), height: InterfaceScale.metric(28))
         case .user:
             AvatarView(name: suggestion.title, url: suggestion.avatarURL, size: InterfaceScale.metric(28))
         case .role:

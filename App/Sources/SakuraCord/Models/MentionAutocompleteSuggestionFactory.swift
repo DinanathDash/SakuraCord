@@ -117,6 +117,20 @@ enum MentionAutocompleteSuggestionFactory {
             )
         }
 
+        if normalizedQuery.isEmpty || "time".hasPrefix(normalizedQuery) || "@time".hasPrefix(trimmedQuery.lowercased()) {
+            values.insert(
+                MentionAutocompleteSuggestion(
+                    id: "special:time",
+                    title: "@time",
+                    detail: "Refer to a time dynamically in the viewer's time zone",
+                    value: "@time",
+                    target: .timestamp(date: .now, style: nil),
+                    systemImage: "clock"
+                ),
+                at: 0
+            )
+        }
+
         let matchingRoles = roles.compactMap { role -> (GuildRole, Int)? in
             role.name.caseInsensitiveCompare("@everyone") != .orderedSame
                 && (role.isMentionable || canMentionNonMentionableRoles)

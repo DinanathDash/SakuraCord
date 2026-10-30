@@ -105,7 +105,7 @@ extension ComposerView {
 
 enum ComposerEmojiAttributedText {
     static let expression = RegularExpressionFactory.make(
-        #"<a?:[A-Za-z0-9_]+:[0-9]+>|"# + RenderedMention.tokenPattern
+        #"<a?:[A-Za-z0-9_]+:[0-9]+>|"# + RenderedMention.tokenPattern + #"|(?<=^|\s)(@time)(?=\s|$)"#
     )
 
     static func make(
@@ -129,6 +129,21 @@ enum ComposerEmojiAttributedText {
                 )
             }
             let token = (source as NSString).substring(with: match.range)
+            if token == "@time" {
+                let presentation = MentionPresentation(
+                    rawToken: "@time",
+                    label: "@time",
+                    target: .unresolved
+                )
+                result.append(
+                    MentionAttachmentRenderer.attributedString(
+                        presentation: presentation,
+                        font: font
+                    )
+                )
+                cursor = NSMaxRange(match.range)
+                continue
+            }
             if let mention = RenderedMention(rawToken: token) {
                 let presentation = mentionPresentations[token]
                     ?? MentionPresentation.fallback(for: mention)

@@ -663,3 +663,29 @@ private func spoilerOutline(_ source: String) -> String {
     let tooltipForStandard = DiscordTimestampFormatter.tooltip(date: date, style: "f", now: reference, locale: Locale(identifier: "en_US"))
     #expect(tooltipForStandard.contains("hour") || tooltipForStandard.contains("hr"))
 }
+
+@Test func `discord natural language time parser resolves relative and colloquial queries`() {
+    let now = Date(timeIntervalSince1970: 1793364600) // Oct 30, 2026
+
+    let emptyCandidates = DiscordNaturalLanguageTimeParser.candidates(for: "", now: now)
+    #expect(emptyCandidates.count == 1)
+    #expect(emptyCandidates[0].options.count == 4)
+    #expect(emptyCandidates[0].options.contains { $0.style == "R" })
+
+    let relativeFuture = DiscordNaturalLanguageTimeParser.candidates(for: "in 2 hours", now: now)
+    #expect(relativeFuture.count == 1)
+    #expect(Int(relativeFuture[0].date.timeIntervalSince(now)) == 7200)
+
+    let relativePast = DiscordNaturalLanguageTimeParser.candidates(for: "6 days ago", now: now)
+    #expect(relativePast.count == 1)
+    #expect(Int(now.timeIntervalSince(relativePast[0].date)) == 6 * 86400)
+
+    let rawTimestamp = DiscordNaturalLanguageTimeParser.candidates(for: "1793160000", now: now)
+    #expect(rawTimestamp.count == 1)
+    #expect(rawTimestamp[0].date == Date(timeIntervalSince1970: 1793160000))
+
+    let ambiguousDate = DiscordNaturalLanguageTimeParser.candidates(for: "24 October", now: now)
+    #expect(ambiguousDate.count == 2)
+    #expect(ambiguousDate[0].date > now)
+    #expect(ambiguousDate[1].date < now)
+}

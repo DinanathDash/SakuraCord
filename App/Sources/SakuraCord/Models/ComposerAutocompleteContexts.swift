@@ -67,6 +67,39 @@ struct MentionAutocompleteContext {
     }
 }
 
+struct TimeMentionContext: Equatable {
+    private static let expression = RegularExpressionFactory.make(
+        #"(?:^|\s)(@time\s*([^\n]*))$"#
+    )
+
+    let range: NSRange
+    let query: String
+    let rawQuery: String
+
+    init?(text: String, selection: NSRange?) {
+        let cursor = selection?.location ?? text.utf16.count
+        guard selection?.length ?? 0 == 0, cursor <= text.utf16.count else { return nil }
+        let prefix = (text as NSString).substring(to: cursor)
+        guard let match = Self.expression.firstMatch(
+            in: prefix,
+            range: NSRange(location: 0, length: (prefix as NSString).length)
+        ), match.range(at: 1).location != NSNotFound else { return nil }
+
+        let fullToken = (prefix as NSString).substring(with: match.range(at: 1))
+        guard fullToken.hasPrefix("@time ") || fullToken.contains(" ") else {
+            return nil
+        }
+        range = match.range(at: 1)
+        if match.numberOfRanges > 2, match.range(at: 2).location != NSNotFound {
+            rawQuery = (prefix as NSString).substring(with: match.range(at: 2))
+            query = rawQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+        } else {
+            rawQuery = ""
+            query = ""
+        }
+    }
+}
+
 struct MentionAutocompleteSuggestion: Identifiable {
     let id: String
     let title: String
