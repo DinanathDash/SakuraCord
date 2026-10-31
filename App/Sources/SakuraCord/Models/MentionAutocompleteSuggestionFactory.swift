@@ -117,7 +117,8 @@ enum MentionAutocompleteSuggestionFactory {
             )
         }
 
-        if normalizedQuery.isEmpty || "time".hasPrefix(normalizedQuery) || "@time".hasPrefix(trimmedQuery.lowercased()) {
+        let matchesTime = "time".hasPrefix(normalizedQuery) || "@time".hasPrefix(trimmedQuery.lowercased())
+        if !normalizedQuery.isEmpty, matchesTime {
             values.insert(
                 MentionAutocompleteSuggestion(
                     id: "special:time",

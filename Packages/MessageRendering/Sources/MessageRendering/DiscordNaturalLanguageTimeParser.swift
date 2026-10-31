@@ -46,7 +46,7 @@ public enum DiscordNaturalLanguageTimeParser {
             return [makeCandidate(for: relativeDate, isNow: false, now: now, locale: locale, timeZone: timeZone, calendar: calendar)]
         }
 
-        let dates = parseNaturalDates(query: trimmed, now: now, calendar: calendar)
+        let dates = parseNaturalDates(query: trimmed, now: now, calendar: calendar, timeZone: timeZone)
         return dates.map {
             makeCandidate(for: $0, isNow: false, now: now, locale: locale, timeZone: timeZone, calendar: calendar)
         }
@@ -106,23 +106,27 @@ public enum DiscordNaturalLanguageTimeParser {
 
     private static func parseRelative(query: String, now: Date, calendar: Calendar) -> Date? {
         let lower = query.lowercased()
-        let inPattern = #"^in\s+(\d+)\s*(s|sec|secs|second|seconds|m|min|mins|minute|minutes|h|hr|hrs|hour|hours|d|day|days|w|wk|wks|week|weeks|mo|month|months|y|yr|yrs|year|years)$"#
-        let agoPattern = #"^(\d+)\s*(s|sec|secs|second|seconds|m|min|mins|minute|minutes|h|hr|hrs|hour|hours|d|day|days|w|wk|wks|week|weeks|mo|month|months|y|yr|yrs|year|years)\s+ago$"#
+        let inPattern = #"^in\s+(?:(\d+)|(a|an))\s*(s|sec|secs|second|seconds|m|min|mins|minute|minutes|h|hr|hrs|hour|hours|d|day|days|w|wk|wks|week|weeks|mo|month|months|y|yr|yrs|year|years)$"#
+        let agoPattern = #"^(?:(\d+)|(a|an))\s*(s|sec|secs|second|seconds|m|min|mins|minute|minutes|h|hr|hrs|hour|hours|d|day|days|w|wk|wks|week|weeks|mo|month|months|y|yr|yrs|year|years)\s+ago$"#
 
         if let regex = try? NSRegularExpression(pattern: inPattern, options: .caseInsensitive),
-           let match = regex.firstMatch(in: lower, range: NSRange(lower.startIndex..., in: lower)),
-           let valRange = Range(match.range(at: 1), in: lower),
-           let unitRange = Range(match.range(at: 2), in: lower),
-           let val = Int(lower[valRange]) {
-            return resolveOffset(value: val, unit: String(lower[unitRange]), sign: 1, now: now, calendar: calendar)
+           let match = regex.firstMatch(in: lower, range: NSRange(lower.startIndex..., in: lower)) {
+            let val = match.range(at: 1).location != NSNotFound
+                ? (Range(match.range(at: 1), in: lower).flatMap { Int(lower[$0]) } ?? 1)
+                : 1
+            if let unitRange = Range(match.range(at: 3), in: lower) {
+                return resolveOffset(value: val, unit: String(lower[unitRange]), sign: 1, now: now, calendar: calendar)
+            }
         }
 
         if let regex = try? NSRegularExpression(pattern: agoPattern, options: .caseInsensitive),
-           let match = regex.firstMatch(in: lower, range: NSRange(lower.startIndex..., in: lower)),
-           let valRange = Range(match.range(at: 1), in: lower),
-           let unitRange = Range(match.range(at: 2), in: lower),
-           let val = Int(lower[valRange]) {
-            return resolveOffset(value: val, unit: String(lower[unitRange]), sign: -1, now: now, calendar: calendar)
+           let match = regex.firstMatch(in: lower, range: NSRange(lower.startIndex..., in: lower)) {
+            let val = match.range(at: 1).location != NSNotFound
+                ? (Range(match.range(at: 1), in: lower).flatMap { Int(lower[$0]) } ?? 1)
+                : 1
+            if let unitRange = Range(match.range(at: 3), in: lower) {
+                return resolveOffset(value: val, unit: String(lower[unitRange]), sign: -1, now: now, calendar: calendar)
+            }
         }
 
         return nil
@@ -156,31 +160,55 @@ public enum DiscordNaturalLanguageTimeParser {
         }
     }
 
-    private static func parseNaturalDates(query: String, now: Date, calendar: Calendar) -> [Date] {
-        guard let detector = try? NSDataDetector(types: NSTextCheckingResult.CheckingType.date.rawValue) else {
-            return []
+    private static func parseNaturalDates(
+        query: String,
+        now: Date,
+        calendar: Calendar,
+        timeZone: TimeZone
+    ) -> [Date] {
+        var baseDate: Date?
+
+        if let detector = try? NSDataDetector(types: NSTextCheckingResult.CheckingType.date.rawValue) {
+            let range = NSRange(query.startIndex..., in: query)
+            let matches = detector.matches(in: query, range: range)
+            baseDate = matches.first?.date
         }
-        let range = NSRange(query.startIndex..., in: query)
-        let matches = detector.matches(in: query, range: range)
-        guard let match = matches.first, let baseDate = match.date else {
-            return []
+
+        if baseDate == nil {
+            let fallbackFormats = [
+                "d/M/yyyy HH:mm:ss", "d/M/yyyy HH:mm", "d/M/yyyy h:mm a", "d/M/yyyy",
+                "yyyy-MM-dd HH:mm:ss", "yyyy-MM-dd HH:mm", "yyyy-MM-dd h:mm a", "yyyy-MM-dd",
+                "d-M-yyyy HH:mm", "d-M-yyyy", "d.M.yyyy", "yyyy/MM/dd"
+            ]
+            let formatter = DateFormatter()
+            formatter.locale = Locale(identifier: "en_US_POSIX")
+            formatter.timeZone = timeZone
+            for format in fallbackFormats {
+                formatter.dateFormat = format
+                if let parsed = formatter.date(from: query) {
+                    baseDate = parsed
+                    break
+                }
+            }
         }
+
+        guard let date = baseDate else { return [] }
 
         let hasExplicitYear = query.range(of: #"\b(19\d\d|20\d\d)\b"#, options: .regularExpression) != nil
         if hasExplicitYear {
-            return [baseDate]
+            return [date]
         }
 
-        if baseDate < now {
-            if let future = calendar.date(byAdding: .year, value: 1, to: baseDate) {
-                return [future, baseDate]
+        if date < now {
+            if let future = calendar.date(byAdding: .year, value: 1, to: date) {
+                return [future, date]
             }
         } else {
-            if let past = calendar.date(byAdding: .year, value: -1, to: baseDate) {
-                return [baseDate, past]
+            if let past = calendar.date(byAdding: .year, value: -1, to: date) {
+                return [date, past]
             }
         }
 
-        return [baseDate]
+        return [date]
     }
 }

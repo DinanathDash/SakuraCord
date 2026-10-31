@@ -565,7 +565,7 @@ struct ComposerView: View {
                 ApplicationCommandHelpStrip(draft: draft, issue: commandComposer.fieldIssue, cancel: cancelCommand)
                     .commandPanelSurface(cornerRadius: commandPanelCornerRadius)
             }
-        } else if let context = timeMentionContext, !timeCandidates.isEmpty {
+        } else if let context = timeMentionContext {
             VStack(spacing: 0) {
                 TimeFormatsAutocompleteList(
                     heading: context.query.isEmpty ? "Time formats" : "Time formats for \(context.query.lowercased())",
@@ -578,16 +578,14 @@ struct ComposerView: View {
                     cornerRadius: commandPanelCornerRadius,
                     keyboardSelectionRevision: autocompleteKeyboardSelectionRevision
                 )
-                TimeMentionHelpStrip(cancel: { isAutocompleteDismissed = true })
+                TimeMentionHelpStrip(cancel: { cancelTimeMention(context: context) })
                     .commandPanelSurface(cornerRadius: commandPanelCornerRadius)
             }
         } else if let context = mentionAutocompleteContext {
             let suggestions = mentionAutocompleteSuggestions(for: context)
             if !suggestions.isEmpty {
                 MentionAutocompleteList(
-                    heading: context.kind == .member
-                        ? MentionAutocompleteSuggestionFactory.memberHeading(query: context.query)
-                        : "TEXT CHANNELS",
+                    heading: mentionHeading(for: context, suggestions: suggestions),
                     suggestions: suggestions,
                     selectedIndex: autocompleteIndex,
                     highlight: { autocompleteIndex = $0 },
@@ -1028,8 +1026,15 @@ struct ComposerView: View {
         if supportsCommands, commandComposer.isPickerPresented {
             return handleCommandPickerAutocomplete(command)
         }
-        if let context = timeMentionContext, !allTimeOptions.isEmpty {
-            return handleTimeAutocomplete(command, context: context)
+        if let context = timeMentionContext {
+            if !allTimeOptions.isEmpty {
+                return handleTimeAutocomplete(command, context: context)
+            } else if command == .accept {
+                return true
+            } else if command == .dismiss {
+                isAutocompleteDismissed = true
+                return true
+            }
         }
         if let context = mentionAutocompleteContext, !mentionAutocompleteSuggestions.isEmpty {
             return handleMentionAutocomplete(command, context: context)
@@ -1662,13 +1667,44 @@ private extension ComposerView {
         isAutocompleteDismissed = true
     }
 
+    private func cancelTimeMention(context: TimeMentionContext) {
+        draftSelection = insertInDraft("", replacing: context.range)
+        autocompleteIndex = 0
+        isAutocompleteDismissed = true
+    }
+
     private func acceptMentionAutocomplete(
         _ suggestion: MentionAutocompleteSuggestion,
         context: MentionAutocompleteContext
     ) {
+        if suggestion.id == "special:time" {
+            draftSelection = insertInDraft("@time ", replacing: context.range)
+            autocompleteIndex = 0
+            isAutocompleteDismissed = false
+            isFocused = true
+            return
+        }
         if let member = suggestion.member { model.rememberMentionMember(member) }
         draftSelection = insertInDraft(suggestion.value + " ", replacing: context.range)
         autocompleteIndex = 0
         isAutocompleteDismissed = true
+    }
+
+    private func mentionHeading(
+        for context: MentionAutocompleteContext,
+        suggestions: [MentionAutocompleteSuggestion]
+    ) -> String {
+        switch context.kind {
+        case .channel:
+            return "TEXT CHANNELS"
+        case .member:
+            if suggestions.allSatisfy({ $0.id == "special:time" }) {
+                return "SPECIAL MENTIONS"
+            }
+            if suggestions.first?.id == "special:time" {
+                return "MATCHING @\(context.query.uppercased())"
+            }
+            return MentionAutocompleteSuggestionFactory.memberHeading(query: context.query)
+        }
     }
 }

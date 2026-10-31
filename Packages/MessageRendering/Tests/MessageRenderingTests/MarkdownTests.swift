@@ -688,4 +688,11 @@ private func spoilerOutline(_ source: String) -> String {
     #expect(ambiguousDate.count == 2)
     #expect(ambiguousDate[0].date > now)
     #expect(ambiguousDate[1].date < now)
+
+    let inAYear = DiscordNaturalLanguageTimeParser.candidates(for: "in a year", now: now)
+    #expect(inAYear.count == 1)
+    #expect(inAYear[0].date > now)
+
+    let slashDate = DiscordNaturalLanguageTimeParser.candidates(for: "20/10/2026", now: now)
+    #expect(slashDate.count == 1)
 }

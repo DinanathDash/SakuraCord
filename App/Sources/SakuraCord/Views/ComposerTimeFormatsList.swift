@@ -39,32 +39,34 @@ struct TimeFormatRow: View {
     let select: () -> Void
 
     var body: some View {
-        Button(action: select) {
-            HStack {
-                Text(option.displayText)
-                    .font(.interfaceSystem(size: 14, weight: .regular))
-                    .foregroundStyle(Color.primary)
-                    .padding(.horizontal, InterfaceScale.metric(8))
-                    .padding(.vertical, InterfaceScale.metric(4))
-                    .background(
-                        Color.primary.opacity(isSelected ? 0.22 : 0.08),
-                        in: RoundedRectangle(cornerRadius: InterfaceScale.metric(4), style: .continuous)
-                    )
-                Spacer()
-            }
-            .padding(.horizontal, InterfaceScale.metric(12))
-            .frame(height: InterfaceScale.metric(34))
-            .contentShape(Rectangle())
+        HStack {
+            Text(option.displayText)
+                .font(.interfaceSystem(size: 13.5, weight: .regular))
+                .foregroundStyle(Color.primary)
+                .padding(.horizontal, InterfaceScale.metric(8))
+                .padding(.vertical, InterfaceScale.metric(4))
+                .background(
+                    Color.primary.opacity(isSelected ? 0.22 : 0.08),
+                    in: RoundedRectangle(cornerRadius: InterfaceScale.metric(4), style: .continuous)
+                )
+            Spacer()
         }
-        .buttonStyle(.plain)
+        .padding(.horizontal, InterfaceScale.metric(8))
+        .frame(height: InterfaceScale.metric(34))
+        .background(
+            isSelected ? Color.primary.opacity(0.08) : Color.clear,
+            in: RoundedRectangle(cornerRadius: InterfaceScale.metric(4), style: .continuous)
+        )
+        .contentShape(Rectangle())
     }
 }
 
 private struct FlatTimeOption: Identifiable {
+    let id: String
     let candidateIndex: Int
     let option: DiscordParsedTimeCandidate.Option
     let flatIndex: Int
-    var id: String { option.id }
+    let hasDividerBefore: Bool
 }
 
 struct TimeFormatsAutocompleteList: View {
@@ -81,8 +83,16 @@ struct TimeFormatsAutocompleteList: View {
         var result: [FlatTimeOption] = []
         var flat = 0
         for (cIndex, candidate) in candidates.enumerated() {
-            for option in candidate.options {
-                result.append(FlatTimeOption(candidateIndex: cIndex, option: option, flatIndex: flat))
+            for (oIndex, option) in candidate.options.enumerated() {
+                result.append(
+                    FlatTimeOption(
+                        id: option.id,
+                        candidateIndex: cIndex,
+                        option: option,
+                        flatIndex: flat,
+                        hasDividerBefore: cIndex > 0 && oIndex == 0
+                    )
+                )
                 flat += 1
             }
         }
@@ -91,38 +101,39 @@ struct TimeFormatsAutocompleteList: View {
 
     var body: some View {
         ComposerAutocompletePanel(heading: heading, cornerRadius: cornerRadius) {
-            ScrollViewReader { proxy in
-                ScrollView(.vertical, showsIndicators: false) {
-                    VStack(alignment: .leading, spacing: 0) {
-                        ForEach(candidates.indices, id: \.self) { cIndex in
-                            if cIndex > 0 {
+            if candidates.isEmpty {
+                HStack {
+                    Text("No matching time formats")
+                        .font(.interfaceSystem(size: 13, weight: .regular))
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                }
+                .padding(.horizontal, InterfaceScale.metric(14))
+                .padding(.vertical, InterfaceScale.metric(10))
+            } else {
+                ComposerSuggestionList(
+                    rows: allOptions,
+                    selectedID: allOptions.indices.contains(selectedIndex) ? allOptions[selectedIndex].id : nil,
+                    keyboardSelectionRevision: keyboardSelectionRevision,
+                    maximumHeight: InterfaceScale.metric(260),
+                    rowHeight: { $0.hasDividerBefore ? InterfaceScale.metric(44) : InterfaceScale.metric(34) },
+                    highlight: { highlight($0.flatIndex) },
+                    activate: { select($0.option) },
+                    content: { row in
+                        VStack(spacing: 0) {
+                            if row.hasDividerBefore {
                                 Divider()
-                                    .padding(.horizontal, InterfaceScale.metric(12))
+                                    .padding(.horizontal, InterfaceScale.metric(10))
                                     .padding(.vertical, InterfaceScale.metric(4))
                             }
-                            ForEach(candidates[cIndex].options) { option in
-                                if let flatIndex = allOptions.first(where: { $0.option.id == option.id })?.flatIndex {
-                                    TimeFormatRow(
-                                        option: option,
-                                        isSelected: selectedIndex == flatIndex,
-                                        select: { select(option) }
-                                    )
-                                    .id(option.id)
-                                    .onHover { isHovered in
-                                        if isHovered { highlight(flatIndex) }
-                                    }
-                                }
-                            }
+                            TimeFormatRow(
+                                option: row.option,
+                                isSelected: selectedIndex == row.flatIndex,
+                                select: { select(row.option) }
+                            )
                         }
                     }
-                    .padding(.vertical, InterfaceScale.metric(4))
-                }
-                .frame(maxHeight: InterfaceScale.metric(220))
-                .onChange(of: keyboardSelectionRevision) { _, _ in
-                    if allOptions.indices.contains(selectedIndex) {
-                        proxy.scrollTo(allOptions[selectedIndex].option.id, anchor: .center)
-                    }
-                }
+                )
             }
         }
     }
